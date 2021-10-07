@@ -2,4 +2,4 @@ dask
 pandas
 numpy
 xarray
-git+https://github.com/chrchang/plink-ng.git#egg=pgenlib\&subdirectory=2.0/Python
+git+https://github.com/chrchang/plink-ng.git#egg=pgenlib&subdirectory=2.0/Python
