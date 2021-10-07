@@ -16,5 +16,12 @@ setup(
     author="Kangcheng Hou",
     author_email="kangchenghou@gmail.com",
     packages=["xrpgen"],
-    setup_requires=["numpy"],
+    setup_requires=["numpy", "Cython"],
+    install_requires=[
+        "dask",
+        "pandas",
+        "numpy",
+        "xarray",
+        "pgenlib @ git+https://github.com/chrchang/plink-ng.git#egg=pgenlib&subdirectory=2.0/Python",
+    ],
 )
