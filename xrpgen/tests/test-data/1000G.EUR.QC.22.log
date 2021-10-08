@@ -1,0 +1,22 @@
+PLINK v2.00a3LM 64-bit Intel (8 Jun 2021)
+Options in effect:
+  --bfile 1000G.EUR.QC.22
+  --make-pgen
+  --out 1000G.EUR.QC.22
+
+Hostname: n2186
+Working directory: /u/project/pasaniuc/kangchen/software/xarray-pgen/xrpgen/tests/test-data
+Start time: Thu Oct  7 19:05:55 2021
+
+Random number seed: 1633658755
+32173 MiB RAM detected; reserving 16086 MiB for main workspace.
+Using up to 8 compute threads.
+489 samples (0 females, 0 males, 489 ambiguous; 489 founders) loaded from
+1000G.EUR.QC.22.fam.
+141123 variants loaded from 1000G.EUR.QC.22.bim.
+Note: No phenotype data present.
+Writing 1000G.EUR.QC.22.psam ... done.
+Writing 1000G.EUR.QC.22.pvar ... done.
+Writing 1000G.EUR.QC.22.pgen ... done.
+
+End time: Thu Oct  7 19:05:55 2021
