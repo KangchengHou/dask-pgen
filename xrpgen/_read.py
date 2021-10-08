@@ -42,9 +42,9 @@ def read_pgen(path: str, snp_chunk: int = 1024, phase: bool = False):
     while snp_start < n_snp:
         snp_stop = min(snp_start + snp_chunk, n_snp)
         if phase:
-            shape: Any = (n_indiv, snp_stop - snp_start, 2)
+            shape: Any = (snp_stop - snp_start, n_indiv, 2)
         else:
-            shape = (n_indiv, snp_stop - snp_start)
+            shape = (snp_stop - snp_start, n_indiv)
 
         snp_chunk_xs.append(
             from_delayed(
@@ -61,7 +61,7 @@ def read_pgen(path: str, snp_chunk: int = 1024, phase: bool = False):
         )
         snp_start = snp_stop
     pgen.close()
-    return concatenate(snp_chunk_xs, 1, False)
+    return concatenate(snp_chunk_xs, 0, False).swapaxes(0, 1)
 
 
 def _read_pgen_chunk(
@@ -101,6 +101,6 @@ def _read_pgen_chunk(
     geno[geno == -9] = np.nan
 
     if phase:
-        return np.dstack([geno[:, ::2], geno[:, 1::2]]).swapaxes(0, 1)
+        return geno.reshape(snp_stop - snp_start, n_indiv, 2)
     else:
-        return geno.T
+        return geno

@@ -21,8 +21,6 @@ def test_pandas_plink_consistency():
 # TODO: download some large plink1 data sets
 # bencmark between pandas_plink and xrpgen
 
-# TODO: benchmark within xrpgen for plink1 and plink2 files.
-
 
 def test_benchmark_pandas_plink(benchmark):
     path = xrpgen.get_test_data("1000G.EUR.QC.22.bed")
