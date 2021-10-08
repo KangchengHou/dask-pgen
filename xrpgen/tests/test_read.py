@@ -36,7 +36,13 @@ def test_benchmark_xrpgen_plink1(benchmark):
     benchmark(dset[:, 0:5000].compute)
 
 
-def test_benchmark_xrpgen_plink2(benchmark):
+def test_benchmark_xrpgen_plink2_no_phase(benchmark):
     path = xrpgen.get_test_data("1000G.EUR.QC.22.pgen")
     dset = xrpgen.read_pgen(path, phase=False)
     benchmark(dset[:, 0:5000].compute)
+
+
+def test_benchmark_xrpgen_plink2_phase(benchmark):
+    path = xrpgen.get_test_data("1000G.EUR.QC.22.pgen")
+    dset = xrpgen.read_pgen(path, phase=True)
+    benchmark(dset[:, 0:5000, :].compute)
