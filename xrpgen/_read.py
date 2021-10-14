@@ -2,6 +2,45 @@ import pgenlib
 import numpy as np
 import xarray as xr
 from typing import Any, Dict
+import pandas as pd
+
+# TODO: instead of SNP chunk, use expected storage size of genotype
+
+
+def read_pfile(pfile: str, phase=False, snp_chunk: int = 1024):
+    """read plink file and form xarray.Dataset
+
+    Parameters
+    ----------
+    path : str
+        path to plink file prefix without .bed/.bim/.fam
+
+    Returns
+    -------
+
+    """
+
+    # count number of a0 as dosage, (A1 in usual PLINK bim file)
+    pgen = read_pgen(
+        pfile + ".pgen",
+        phase=phase,
+        snp_chunk=snp_chunk,
+    )
+    pvar = read_pvar(pfile + ".pvar")
+    psam = read_psam(pfile + ".psam")
+
+    if phase:
+        geno = xr.DataArray(
+            data=pgen,
+            dims=["snp", "indiv", "ploidy"],
+            coords=[pvar.index, psam.index, ["ploidy1", "ploidy2"]],
+        )
+    else:
+        geno = xr.DataArray(
+            data=pgen, dims=["snp", "indiv"], coords=[pvar.index, psam.index]
+        )
+
+    return geno, pvar, psam
 
 
 def read_pgen(path: str, snp_chunk: int = 1024, phase: bool = False):
@@ -21,7 +60,7 @@ def read_pgen(path: str, snp_chunk: int = 1024, phase: bool = False):
 
     Returns
     -------
-    geno : dask.array.core.Array
+    geno : dask.array.core.Array (n_snp, n_indiv, 2) or (n_snp, n_indiv)
     """
 
     from dask.array import concatenate, from_delayed
@@ -61,9 +100,12 @@ def read_pgen(path: str, snp_chunk: int = 1024, phase: bool = False):
         )
         snp_start = snp_stop
     pgen.close()
-    return concatenate(snp_chunk_xs, 0, False).swapaxes(0, 1)
+    return concatenate(snp_chunk_xs, 0, False)
 
 
+# TODO: support fast reading a transposed genotype matrix
+# There may be currently a bug in pgenlib.pyx, which causes the transpose to
+# fail.
 def _read_pgen_chunk(
     path: str, snp_start: int, snp_stop: int, phase: bool, n_indiv: int = None
 ):
@@ -80,8 +122,8 @@ def _read_pgen_chunk(
     snp_stop : int
         Last SNP to read
     phase : bool
-        If True, return phased genotypes (n_indiv, n_snp, 2)
-        If False, return unphased genotypes (n_indiv, n_snp)
+        If True, return phased genotypes (n_snp, n_indiv, 2)
+        If False, return unphased genotypes (n_snp, n_indiv)
     n_indiv : int
         Number of individuals in the pgen file
     """
@@ -104,3 +146,40 @@ def _read_pgen_chunk(
         return geno.reshape(snp_stop - snp_start, n_indiv, 2)
     else:
         return geno
+
+
+def read_pvar(path):
+    skiprows = 0
+    with open(path) as f:
+        for line in f:
+            if line.startswith("#CHROM"):
+                break
+            skiprows += 1
+
+    df_pvar = (
+        pd.read_csv(path, delim_whitespace=True, skiprows=skiprows)
+        .rename(columns={"#CHROM": "CHROM", "ID": "snp"})
+        .set_index("snp")
+    )
+    assert np.isin(
+        ["CHROM", "POS", "REF", "ALT"], df_pvar.columns
+    ).all(), "pvar file must have columns CHROM, POS, SNP, REF, and ALT"
+
+    return df_pvar
+
+
+def read_psam(path):
+    skiprows = 0
+    with open(path) as f:
+        for line in f:
+            if line.startswith("#IID"):
+                break
+            skiprows += 1
+
+    df_psam = (
+        pd.read_csv(path, delim_whitespace=True, skiprows=skiprows)
+        .rename(columns={"#IID": "indiv"})
+        .set_index("indiv")
+    )
+
+    return df_psam
