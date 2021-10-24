@@ -1,6 +1,5 @@
 import pgenlib
 import numpy as np
-import xarray as xr
 from typing import Any, Dict
 import pandas as pd
 
@@ -12,35 +11,33 @@ def read_pfile(pfile: str, phase=False, snp_chunk: int = 1024):
 
     Parameters
     ----------
-    path : str
-        path to plink file prefix without .bed/.bim/.fam
+    pfile : str
+        path to plink file prefix without .pgen/.pvar/.psam
+    phase : bool
+        whether to read the phasing information of data
+    snp_chunk: int
+        number of SNPs within a chunk
 
     Returns
     -------
-
+    (geno, df_snp, df_indiv)
+        geno: genotype matrix
+            (n_snp, n_indiv) if phase is set to False
+            (n_snp, n_indiv, 2) if phase is set to True
+        df_snp: SNP information data frame
+        df_indiv: individual information data frame
     """
 
     # count number of a0 as dosage, (A1 in usual PLINK bim file)
-    pgen = read_pgen(
+    geno = read_pgen(
         pfile + ".pgen",
         phase=phase,
         snp_chunk=snp_chunk,
     )
-    pvar = read_pvar(pfile + ".pvar")
-    psam = read_psam(pfile + ".psam")
+    df_snp = read_pvar(pfile + ".pvar")
+    df_indiv = read_psam(pfile + ".psam")
 
-    if phase:
-        geno = xr.DataArray(
-            data=pgen,
-            dims=["snp", "indiv", "ploidy"],
-            coords=[pvar.index, psam.index, ["ploidy1", "ploidy2"]],
-        )
-    else:
-        geno = xr.DataArray(
-            data=pgen, dims=["snp", "indiv"], coords=[pvar.index, psam.index]
-        )
-
-    return geno, pvar, psam
+    return geno, df_snp, df_indiv
 
 
 def read_pgen(path: str, snp_chunk: int = 1024, phase: bool = False):
@@ -127,6 +124,7 @@ def _read_pgen_chunk(
     n_indiv : int
         Number of individuals in the pgen file
     """
+    # np.int32 is required by pgenlib
     with pgenlib.PgenReader(bytes(path, "utf8"), raw_sample_ct=n_indiv) as pgen:
         if phase:
             geno = np.empty(
