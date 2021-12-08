@@ -1,12 +1,222 @@
 import pgenlib
 import numpy as np
-from typing import Any, Dict
+from typing import Any, Dict, Tuple, List, Union, Optional
 import pandas as pd
+import dask.array as da
+import glob
+import os
 
+
+def _read_single_plink(path: str, phase: bool, snp_chunk: int):
+    geno = read_pgen(
+        path,
+        phase=phase,
+        snp_chunk=snp_chunk,
+    )
+    if path.endswith(".pgen"):
+        df_snp = read_pvar(path.replace(".pgen", ".pvar"))
+        df_indiv = read_psam(path.replace(".pgen", ".psam"))
+    elif path.endswith(".bed"):
+        df_snp = read_bim(path.replace(".bed", ".bim"))
+        df_indiv = read_fam(path.replace(".bed", ".fam"))
+    return geno, df_snp, df_indiv
+
+
+def _read_multiple_plink(
+    paths: List[str], phase: bool, snp_chunk: int, merge_dim: Optional[str] = None
+) -> Tuple[da.Array, pd.DataFrame, pd.DataFrame]:
+    """_read_multiple_plink
+
+    Parameters
+    ----------
+    paths : List[str]
+        list of paths to plink files
+    phase : bool
+        Whether to read the phasing information of data
+    snp_chunk : int
+        number of SNPs within a chunk
+    merge_dim : bool, optional
+        dimension over which to merge, by default None, can be "snp" or "indiv"
+        merge_dim = None: infer from the first two files
+        merge_dim = "snp" will concatenate different SNP set into one array
+        merge_dim = "indiv" will concatenate different individual set into one array
+
+    Returns
+    -------
+    Tuple[da.Array, pd.DataFrame, pd.DataFrame]
+        tuple of genotype, df_snp and df_indiv
+
+    Raises
+    ------
+    ValueError
+        [description]
+    ValueError
+        [description]
+    """
+    assert len(paths) > 1, "Need at least two files to merge"
+    if merge_dim is None:
+        # infer merge_dim from the first two files
+        if paths[0].endswith(".pgen"):
+            df_snp1 = read_pvar(paths[0].replace(".pgen", ".pvar"))
+            df_snp2 = read_pvar(paths[1].replace(".pgen", ".pvar"))
+        elif paths[0].endswith(".bed"):
+            df_snp1 = read_bim(paths[0].replace(".bed", ".bim"))
+            df_snp2 = read_bim(paths[1].replace(".bed", ".bim"))
+        else:
+            raise ValueError("path must end with .pgen or .bed")
+        if df_snp1.index.equals(df_snp2.index):
+            merge_dim = "indiv"
+        else:
+            merge_dim = "snp"
+
+    assert merge_dim in ["snp", "indiv"]
+
+    geno_list = []
+    df_snp_list = []
+    df_indiv_list = []
+    for path in paths:
+        geno, df_snp, df_indiv = _read_single_plink(
+            path=path, phase=phase, snp_chunk=snp_chunk
+        )
+        geno_list.append(geno)
+        df_snp_list.append(df_snp)
+        df_indiv_list.append(df_indiv)
+
+    if merge_dim == "indiv":
+        # check snp are all the same
+        assert np.all(
+            [df_snp.equals(df_snp_list[0]) for df_snp in df_snp_list[1:]]
+        ), "df_snp are not all the same when merging on indiv"
+        df_snp = df_snp_list[0]
+        geno = da.concatenate(geno_list, axis=1)
+        df_indiv = pd.concat(df_indiv_list, axis=0)
+    elif merge_dim == "snp":
+        # determine the df_snp order such that the order is sorted by
+        # last element of CHROM and POS in each df_snp
+        df_chrom_pos = pd.DataFrame(
+            [
+                [df_snp.iloc[-1]["CHROM"], df_snp.iloc[-1]["POS"]]
+                for df_snp in df_snp_list
+            ],
+            columns=["CHROM", "POS"],
+        )
+        # sort by CHROM and POS
+        order = df_chrom_pos.sort_values(by=["CHROM", "POS"]).index
+        # adjust order for geno_list, df_snp_list
+        geno_list = [geno_list[i] for i in order]
+        df_snp_list = [df_snp_list[i] for i in order]
+        assert np.all(
+            [df_indiv.equals(df_indiv_list[0]) for df_indiv in df_indiv_list[1:]]
+        ), "df_indiv are not all the same when merging on snp"
+        # concatenate
+        geno = da.concatenate(geno_list, axis=0)
+        df_snp = pd.concat(df_snp_list, axis=0)
+        df_indiv = df_indiv_list[0]
+    else:
+        raise ValueError("merge_dim must be either 'snp' or 'indiv'")
+
+    # check df_snp is sorted by CHROM and POS
+    assert df_snp.sort_values(by=["CHROM", "POS"]).equals(
+        df_snp
+    ), "df_snp is not sorted by CHROM and POS"
+    return geno, df_snp, df_indiv
+
+
+def parse_plink_path(pathname: Union[str, List]) -> List[str]:
+    """Parse a input plink file pattern into a list of files
+
+    Parameters
+    ----------
+    filename : str
+        Path to the plink file
+
+    Returns
+    -------
+    list
+        List of lists containing the plink file
+    """
+    if isinstance(pathname, list):
+        # already a list of paths
+        out = pathname
+    elif isinstance(pathname, str):
+        if pathname.endswith(".bed") or pathname.endswith(".pgen"):
+            out = [pathname]
+        elif pathname.endswith(".txt"):
+            # pattern is a file with a list of files
+            with open(pathname, "r") as f:
+                out = [line.strip() for line in f]
+        elif "*" in pathname:
+            # pattern is a file pattern
+            # find all files matching the pattern
+            out = glob.glob(pathname)
+        # pathname is a directory
+        elif os.path.isdir(pathname):
+            out = glob.glob(pathname + "/*")
+            pgen_list = [p for p in out if p.endswith(".pgen")]
+            bed_list = [p for p in out if p.endswith(".bed")]
+            assert (len(pgen_list) > 0) != (
+                len(bed_list) > 0
+            ), f"Either the directory={pathname} contains .pgen or .bed files, but not both"
+            if len(pgen_list) > 0:
+                out = pgen_list
+            elif len(bed_list) > 0:
+                out = bed_list
+            else:
+                raise ValueError(
+                    f"Either the directory={pathname} contains .pgen or .bed files,"
+                    " but not both"
+                )
+        else:
+            raise ValueError("Unable to parse plink pathname")
+
+    # either all path endswith .pgen or .bed
+    assert all(p.endswith(".pgen") for p in out) or all(
+        p.endswith(".bed") for p in out
+    ), "Either all files end with .pgen or all files end with .bed"
+    return out
+
+
+def read_plink(pathname, phase=False, snp_chunk=1024):
+    """General-purpose function to read plink files
+    Usage includes
+    - read_plink(pathname="chr21.bed", phase=False)
+    - read_plink(pathname="chr22.pgen", phase=True)
+    - read_plink(pathname="*.pgen", phase=True)
+    - read_plink(pathname="file_list.txt") # file_list.txt contains rows of file names
+
+    Parameters
+    ----------
+    pathname : str
+        Path to plink file prefix without .pgen/.pvar/.psam
+    phase : bool
+        Whether to read the phasing information of data
+    snp_chunk: int
+        number of SNPs within a chunk
+
+    Returns
+    -------
+    (geno, df_snp, df_indiv)
+        geno: genotype matrix
+            (n_snp, n_indiv) if phase is set to False
+            (n_snp, n_indiv, 2) if phase is set to True
+        df_snp: SNP information data frame
+        df_indiv: individual information data frame
+    """
+
+    path_list = parse_plink_path(pathname)
+    if len(path_list) == 1:
+        # only one file
+        return _read_single_plink(path_list[0], phase=phase, snp_chunk=snp_chunk)
+    else:
+        # multiple files
+        return _read_multiple_plink(path_list, phase=phase, snp_chunk=snp_chunk)
+
+
+# TODO: after read_plink is done, remove this function
 # TODO: instead of SNP chunk, use expected storage size of genotype
-
-
-def read_pfile(pfile: str, phase=False, snp_chunk: int = 1024):
+def read_pfile(
+    pfile: str, phase=False, snp_chunk: int = 1024
+) -> Tuple[da.Array, pd.DataFrame, pd.DataFrame]:
     """read plink file and form xarray.Dataset
 
     Parameters
@@ -42,7 +252,7 @@ def read_pfile(pfile: str, phase=False, snp_chunk: int = 1024):
 
 def read_pgen(path: str, snp_chunk: int = 1024, phase: bool = False):
 
-    """Read pgen
+    """Read pgen file including .pgen and .bed files
 
     Parameters
     ----------
@@ -57,7 +267,7 @@ def read_pgen(path: str, snp_chunk: int = 1024, phase: bool = False):
 
     Returns
     -------
-    geno : dask.array.core.Array (n_snp, n_indiv, 2) or (n_snp, n_indiv)
+    geno : da.Array (n_snp, n_indiv, 2) or (n_snp, n_indiv)
     """
 
     from dask.array import concatenate, from_delayed
@@ -100,9 +310,6 @@ def read_pgen(path: str, snp_chunk: int = 1024, phase: bool = False):
     return concatenate(snp_chunk_xs, 0, False)
 
 
-# TODO: support fast reading a transposed genotype matrix
-# There may be currently a bug in pgenlib.pyx, which causes the transpose to
-# fail.
 def _read_pgen_chunk(
     path: str, snp_start: int, snp_stop: int, phase: bool, n_indiv: int = None
 ):
@@ -144,6 +351,25 @@ def _read_pgen_chunk(
         return geno.reshape(snp_stop - snp_start, n_indiv, 2)
     else:
         return geno
+
+
+def read_bim(path: str) -> pd.DataFrame:
+    return pd.read_csv(
+        path,
+        header=None,
+        delim_whitespace=True,
+        names=["CHROM", "snp", "CM", "POS", "ALT", "REF"],
+    ).set_index("snp")
+
+
+def read_fam(path: str):
+    return pd.read_csv(
+        path,
+        header=None,
+        delim_whitespace=True,
+        usecols=[0, 1],
+        names=["FID", "IID"],
+    ).astype(str)
 
 
 def read_pvar(path):
