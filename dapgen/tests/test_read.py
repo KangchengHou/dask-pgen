@@ -45,13 +45,13 @@ def test_benchmark_dapgen_plink1(benchmark):
 #     benchmark(dset[:, 0:5000, :].compute)
 
 
-def test_benchmark_dapgen_plink2_no_phase(benchmark):
-    path = "/u/project/pasaniuc/pasaniucdata/admixture/projects/PAGE-QC/s01_vcf_dataset/hm3/merged.pgen"
-    dset = dapgen.read_pgen(path, phase=False)
-    benchmark(dset[0:5000, :].compute)
+# def test_benchmark_dapgen_plink2_no_phase(benchmark):
+#     path = "/u/project/pasaniuc/pasaniucdata/admixture/projects/PAGE-QC/s01_vcf_dataset/hm3/merged.pgen"
+#     dset = dapgen.read_pgen(path, phase=False)
+#     benchmark(dset[0:5000, :].compute)
 
 
-def test_benchmark_dapgen_plink2_phase(benchmark):
-    path = "/u/project/pasaniuc/pasaniucdata/admixture/projects/PAGE-QC/s01_vcf_dataset/hm3/merged.pgen"
-    dset = dapgen.read_pgen(path, phase=True)
-    benchmark(dset[0:5000, :, :].compute)
+# def test_benchmark_dapgen_plink2_phase(benchmark):
+#     path = "/u/project/pasaniuc/pasaniucdata/admixture/projects/PAGE-QC/s01_vcf_dataset/hm3/merged.pgen"
+#     dset = dapgen.read_pgen(path, phase=True)
+#     benchmark(dset[0:5000, :, :].compute)
