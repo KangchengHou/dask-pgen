@@ -4,7 +4,98 @@ import numpy as np
 import tempfile
 import os
 import subprocess
+import shutil
+import dapgen
+import os
+from contextlib import contextmanager
+import os
+import urllib
 from ._read import read_pvar, read_bim, parse_plink_path, infer_merge_dim
+
+
+@contextmanager
+def cd(newdir):
+    prevdir = os.getcwd()
+    os.chdir(os.path.expanduser(newdir))
+    try:
+        yield
+    finally:
+        os.chdir(prevdir)
+
+
+def get_cache_dir() -> str:
+    """Get the cache directory for admix-kit
+    Returns
+    -------
+    [type]
+        [description]
+    """
+    cache_dir = os.path.join(os.path.dirname(dapgen.__file__), "../.dapgen_cache")
+    os.makedirs(cache_dir, exist_ok=True)
+    return cache_dir
+
+
+def get_dependency(name, download=True):
+
+    """Get path to an depenency
+    Find the binary in the following locations:
+    - $PATH
+    - package installment directory admix-tools/.admix_cache/bin/<name>
+    If not found in any of these locations, download the corresponding software package
+    - plink: https://www.cog-genomics.org/plink/2.0/
+    - gcta: https://github.com/gcta/gcta
+    Parameters
+    ----------
+    download : bool
+        whether to download plink if not found
+    Returns
+    -------
+    Path to binary executable
+    """
+    from os.path import join
+
+    # find in path
+    if shutil.which(name):
+        return shutil.which(name)
+
+    # find in cache
+    cache_dir = join(get_cache_dir(), "bin")
+    os.makedirs(cache_dir, exist_ok=True)
+    cache_bin_path = join(cache_dir, name)
+    if shutil.which(cache_bin_path):
+        return cache_bin_path
+    else:
+        # download
+        if download:
+            from sys import platform
+
+            if name == "plink2":
+                if platform == "darwin":
+                    url = "https://s3.amazonaws.com/plink2-assets/alpha2/plink2_mac.zip"
+                elif platform == "linux":
+                    url = "https://s3.amazonaws.com/plink2-assets/alpha2/plink2_linux_x86_64.zip"
+                else:
+                    raise ValueError(f"Unsupported platform {platform}")
+
+                with tempfile.TemporaryDirectory() as tmp_dir:
+                    with cd(tmp_dir):
+                        urllib.request.urlretrieve(
+                            url,
+                            "file.zip",
+                        )
+                        subprocess.check_call(f"unzip file.zip -d dir", shell=True)
+                        subprocess.check_call(
+                            f"mv dir/plink2 {cache_bin_path}", shell=True
+                        )
+            else:
+                raise ValueError(f"Unsupported software {name}")
+
+        else:
+            raise ValueError(
+                f"{name} not found in $PATH or {cache_dir}, set `download=True` to download from website"
+            )
+
+        return cache_bin_path
 
 
 def _score_single_plink(
@@ -36,25 +127,12 @@ def _score_single_plink(
     df_weight.index = df_snp_idx
     df_weight.index.name = "SNP"
 
-    # else:
-    #     # using SNP ID to align
-    #     common_idx = df_snp.index.intersection(df_weight.index)
-    #     df_snp = df_snp.loc[common_idx, :]
-    #     df_weight = df_weight.loc[common_idx, :]
-    #     assert df_snp.CHROM.equals(df_weight.CHROM), "CHROM must be the same"
-    #     assert df_snp.POS.equals(df_weight.POS), "POS must be the same"
-    #     assert np.all(
-    #         df_snp.REF.equals(df_weight.REF) + df_snp.REF.equals(df_weight.ALT) == 1
-    #     )
-    #     assert np.all(
-    #         df_snp.ALT.equals(df_weight.REF) + df_snp.ALT.equals(df_weight.ALT) == 1
-    #     )
-    #     df_weight = df_weight.loc[:, ["ALT"] + weight_cols]
-    #     df_weight.index.name = "SNP"
-
+    plink2_bin = get_dependency("plink2")
     with tempfile.TemporaryDirectory() as tmp_dir:
         df_weight.to_csv(os.path.join(tmp_dir, "weight.txt"), sep="\t", index=True)
-        cmds = [f"plink2 --score {tmp_dir}/weight.txt 1 2 header-read cols=+scoresums"]
+        cmds = [
+            f"{plink2_bin} --score {tmp_dir}/weight.txt 1 2 header-read cols=+scoresums"
+        ]
         cmds += [f"--score-col-nums 3-{len(df_weight.columns) + 1}"]
         if path.endswith(".pgen"):
             cmds += [f"--pfile {path[:-5]}"]
@@ -91,28 +169,36 @@ def _score_multiple_plink(
 
     assert merge_dim in ["snp", "indiv"]
 
-    df_score_list = []
-    df_snp_list = []
-    for path in path_list:
-        df_score, df_snp = _score_single_plink(
-            path=path, df_weight=df_weight, weight_cols=weight_cols
-        )
-        df_score_list.append(df_score)
-        df_snp_list.append(df_snp)
-
     if merge_dim == "indiv":
-        # merge for different indiv
-        assert np.all(
-            [df_snp.equals(df_snp_list[0]) for df_snp in df_snp_list[1:]]
-        ), "df_snp are not all the same when merging on indiv"
-        df_snp = df_snp_list[0]
-        df_score = pd.concat(df_score_list, axis=0)
+        df_score_list = []
+        df_snp = None
+        for path in path_list:
+            df_score, this_df_snp = _score_single_plink(
+                path=path, df_weight=df_weight, weight_cols=weight_cols
+            )
+            df_score_list.append(df_score)
+            if df_snp is None:
+                df_snp = this_df_snp
+            else:
+                assert df_snp.equals(
+                    this_df_snp
+                ), "df_snp must be the same for all indiv"
     elif merge_dim == "snp":
-        # merge for different snp
+        df_score = None
+        df_snp_list = []
+        for path in path_list:
+            this_df_score, df_snp = _score_single_plink(
+                path=path, df_weight=df_weight, weight_cols=weight_cols
+            )
+            if df_score is None:
+                df_score = this_df_score
+            else:
+                assert df_score.index.equals(
+                    this_df_score.index
+                ), "index must be the same"
+                df_score += this_df_score
+            df_snp_list.append(df_snp)
         df_snp = pd.concat(df_snp_list, axis=0)
-        df_score = df_score_list[0]
-        for df_other in df_score_list[1:]:
-            df_score += df_other
     else:
         raise ValueError("merge_dim must be 'indiv' or 'snp'")
     return df_score, df_snp
@@ -142,7 +228,7 @@ def score(
         Path to output file
     """
     # TODO: freq path must be plink_path.freq??
-    assert read_freq is None, "read-in freq is not supported yet"
+    assert read_freq == False, "read-in freq is not supported yet"
     # basic checks on df_weight
     assert np.all([col in df_weight.columns for col in ["CHROM", "POS", "REF", "ALT"]])
 
