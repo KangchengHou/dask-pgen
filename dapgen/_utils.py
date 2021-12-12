@@ -1,6 +1,168 @@
 import pandas as pd
-from typing import Tuple
+from typing import Tuple, List
 import numpy as np
+import tempfile
+import os
+import subprocess
+from ._read import read_pvar, read_bim, parse_plink_path, infer_merge_dim
+
+
+def _score_single_plink(
+    path: str, df_weight: pd.DataFrame, weight_cols: List[str]
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    Score a single plink file against a pd.DataFrame
+
+    Parameters
+    ----------
+    path : str
+        [description]
+    df_weight : pd.DataFrame
+        [description]
+    """
+    if path.endswith(".pgen"):
+        df_snp = read_pvar(path.replace(".pgen", ".pvar"))
+    elif path.endswith(".bed"):
+        df_snp = read_bim(path.replace(".bed", ".bim"))
+
+    # using CHROM, POS, REF, ALT to align
+    # flip_sign is not used because plink2 --score will handle this
+    df_snp_idx, df_weight_idx, flip_sign = align_snp(df_snp, df_weight)
+
+    # subset matched snps, since df_weight will be subsetted, plink2 will cope filter
+    # the `df_snp`, so we don't need to subset `df_snp` here
+    df_snp = df_snp.loc[df_snp_idx]
+    df_weight = df_weight.loc[df_weight_idx, ["ALT"] + weight_cols]
+    df_weight.index = df_snp_idx
+    df_weight.index.name = "SNP"
+
+    # else:
+    #     # using SNP ID to align
+    #     common_idx = df_snp.index.intersection(df_weight.index)
+    #     df_snp = df_snp.loc[common_idx, :]
+    #     df_weight = df_weight.loc[common_idx, :]
+    #     assert df_snp.CHROM.equals(df_weight.CHROM), "CHROM must be the same"
+    #     assert df_snp.POS.equals(df_weight.POS), "POS must be the same"
+    #     assert np.all(
+    #         df_snp.REF.equals(df_weight.REF) + df_snp.REF.equals(df_weight.ALT) == 1
+    #     )
+    #     assert np.all(
+    #         df_snp.ALT.equals(df_weight.REF) + df_snp.ALT.equals(df_weight.ALT) == 1
+    #     )
+    #     df_weight = df_weight.loc[:, ["ALT"] + weight_cols]
+    #     df_weight.index.name = "SNP"
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        df_weight.to_csv(os.path.join(tmp_dir, "weight.txt"), sep="\t", index=True)
+        cmds = [f"plink2 --score {tmp_dir}/weight.txt 1 2 header-read cols=+scoresums"]
+        cmds += [f"--score-col-nums 3-{len(df_weight.columns) + 1}"]
+        if path.endswith(".pgen"):
+            cmds += [f"--pfile {path[:-5]}"]
+        elif path.endswith(".bed"):
+            cmds += [f"--bfile {path[:-4]}"]
+        cmds += [f"--out {tmp_dir}/out"]
+
+        subprocess.check_call(" ".join(cmds), shell=True)
+        # read back in
+        df_score = pd.read_csv(os.path.join(tmp_dir, "out.sscore"), sep="\t")
+    if path.endswith(".pgen"):
+        df_score = df_score.set_index(df_score.columns[0])
+        df_score.index.name = "indiv"
+    elif path.endswith(".bed"):
+        df_score.index = (
+            df_score.iloc[:, 0].astype(str) + "_" + df_score.iloc[:, 1].astype(str)
+        )
+        df_score.index.name = "indiv"
+    else:
+        raise ValueError("path must end with .pgen or .bed")
+    df_score = df_score.loc[:, [col + "_SUM" for col in weight_cols]]
+    df_score.columns = weight_cols
+    return df_score, df_snp
+
+
+def _score_multiple_plink(
+    path_list: List[str], df_weight: pd.DataFrame, weight_cols: List[str]
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
+
+    # multiple plink files
+    merge_dim = infer_merge_dim(path_list)
+    if merge_dim == "indiv":
+        raise ValueError("indiv merge not supported")
+
+    assert merge_dim in ["snp", "indiv"]
+
+    df_score_list = []
+    df_snp_list = []
+    for path in path_list:
+        df_score, df_snp = _score_single_plink(
+            path=path, df_weight=df_weight, weight_cols=weight_cols
+        )
+        df_score_list.append(df_score)
+        df_snp_list.append(df_snp)
+
+    if merge_dim == "indiv":
+        # merge for different indiv
+        assert np.all(
+            [df_snp.equals(df_snp_list[0]) for df_snp in df_snp_list[1:]]
+        ), "df_snp are not all the same when merging on indiv"
+        df_snp = df_snp_list[0]
+        df_score = pd.concat(df_score_list, axis=0)
+    elif merge_dim == "snp":
+        # merge for different snp
+        df_snp = pd.concat(df_snp_list, axis=0)
+        df_score = df_score_list[0]
+        for df_other in df_score_list[1:]:
+            df_score += df_other
+    else:
+        raise ValueError("merge_dim must be 'indiv' or 'snp'")
+    return df_score, df_snp
+
+
+def score(
+    plink_path: str,
+    df_weight: pd.DataFrame,
+    weight_cols: List[str] = None,
+    read_freq: bool = False,
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    Wrapper for scoring plink files against a pd.DataFrame
+
+    CHROM, POS, REF, ALT columns must be present in df_weight and will be used to align
+    with the plink file.
+
+    All other numerical columns will be used as input for scoring.
+
+    Parameters
+    ----------
+    plink_path : str
+        Path to plink file
+    df_weight : pd.DataFrame
+        Dataframe containing weights
+    out : str
+        Path to output file
+    """
+    # TODO: freq path must be plink_path.freq??
+    assert read_freq is None, "read-in freq is not supported yet"
+    # basic checks on df_weight
+    assert np.all([col in df_weight.columns for col in ["CHROM", "POS", "REF", "ALT"]])
+
+    if weight_cols is None:
+        # get numerical columns except for CHROM, POS, REF, ALT
+        weight_cols = [
+            col
+            for col in df_weight.select_dtypes(include=np.number).columns
+            if col not in ["CHROM", "POS", "REF", "ALT"]
+        ]
+
+    # parse plink path
+    path_list = parse_plink_path(plink_path)
+    if len(path_list) == 1:
+        # single plink file
+        df_score, df_snp = _score_single_plink(path_list[0], df_weight, weight_cols)
+    elif len(path_list) > 1:
+        # multiple plink files
+        df_score, df_snp = _score_multiple_plink(path_list, df_weight, weight_cols)
+    return df_score, df_snp
 
 
 def align_snp(

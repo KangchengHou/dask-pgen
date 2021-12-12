@@ -7,6 +7,26 @@ import glob
 import os
 
 
+def infer_merge_dim(paths: List[str]):
+    """
+    Infer the dimension to merge for multiple plink files.
+    """
+    # infer merge_dim from the first two files
+    if paths[0].endswith(".pgen"):
+        df_snp1 = read_pvar(paths[0].replace(".pgen", ".pvar"))
+        df_snp2 = read_pvar(paths[1].replace(".pgen", ".pvar"))
+    elif paths[0].endswith(".bed"):
+        df_snp1 = read_bim(paths[0].replace(".bed", ".bim"))
+        df_snp2 = read_bim(paths[1].replace(".bed", ".bim"))
+    else:
+        raise ValueError("path must end with .pgen or .bed")
+    if df_snp1.index.equals(df_snp2.index):
+        merge_dim = "indiv"
+    else:
+        merge_dim = "snp"
+    return merge_dim
+
+
 def _read_single_plink(path: str, phase: bool, snp_chunk: int):
     geno = read_pgen(
         path,
@@ -55,19 +75,7 @@ def _read_multiple_plink(
     """
     assert len(paths) > 1, "Need at least two files to merge"
     if merge_dim is None:
-        # infer merge_dim from the first two files
-        if paths[0].endswith(".pgen"):
-            df_snp1 = read_pvar(paths[0].replace(".pgen", ".pvar"))
-            df_snp2 = read_pvar(paths[1].replace(".pgen", ".pvar"))
-        elif paths[0].endswith(".bed"):
-            df_snp1 = read_bim(paths[0].replace(".bed", ".bim"))
-            df_snp2 = read_bim(paths[1].replace(".bed", ".bim"))
-        else:
-            raise ValueError("path must end with .pgen or .bed")
-        if df_snp1.index.equals(df_snp2.index):
-            merge_dim = "indiv"
-        else:
-            merge_dim = "snp"
+        merge_dim = infer_merge_dim(paths)
 
     assert merge_dim in ["snp", "indiv"]
 
@@ -363,13 +371,16 @@ def read_bim(path: str) -> pd.DataFrame:
 
 
 def read_fam(path: str):
-    return pd.read_csv(
+    df = pd.read_csv(
         path,
         header=None,
         delim_whitespace=True,
         usecols=[0, 1],
         names=["FID", "IID"],
     ).astype(str)
+    df.index = df.iloc[:, 0].astype(str) + "_" + df.iloc[:, 1].astype(str)
+    df.index.name = "indiv"
+    return df
 
 
 def read_pvar(path):
