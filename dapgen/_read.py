@@ -5,6 +5,7 @@ import pandas as pd
 import dask.array as da
 import glob
 import os
+from natsort import natsorted
 
 
 def infer_merge_dim(paths: List[str]):
@@ -174,6 +175,7 @@ def parse_plink_path(pathname: Union[str, List]) -> List[str]:
                     f"Either the directory={pathname} contains .pgen or .bed files,"
                     " but not both"
                 )
+            out = natsorted(out)
         else:
             raise ValueError("Unable to parse plink pathname")
 

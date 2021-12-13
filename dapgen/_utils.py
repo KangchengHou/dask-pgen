@@ -1,5 +1,5 @@
 import pandas as pd
-from typing import Tuple, List
+from typing import Tuple, List, Optional
 import numpy as np
 import tempfile
 import os
@@ -9,7 +9,8 @@ import dapgen
 import os
 from contextlib import contextmanager
 import os
-import urllib
+import urllib.request
+from tqdm import tqdm
 from ._read import read_pvar, read_bim, parse_plink_path, infer_merge_dim
 
 
@@ -99,7 +100,11 @@ def get_dependency(name, download=True):
 
 
 def _score_single_plink(
-    path: str, df_weight: pd.DataFrame, weight_cols: List[str]
+    path: str,
+    df_weight: pd.DataFrame,
+    weight_cols: List[str],
+    n_threads: int,
+    memory: Optional[int] = None,
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
     Score a single plink file against a pd.DataFrame
@@ -131,8 +136,11 @@ def _score_single_plink(
     with tempfile.TemporaryDirectory() as tmp_dir:
         df_weight.to_csv(os.path.join(tmp_dir, "weight.txt"), sep="\t", index=True)
         cmds = [
-            f"{plink2_bin} --score {tmp_dir}/weight.txt 1 2 header-read cols=+scoresums"
+            f"{plink2_bin} --score {tmp_dir}/weight.txt 1 2 header-read cols=+scoresums,-scoreavgs"
         ]
+        cmds += [f"--threads {n_threads}"]
+        if memory is not None:
+            cmds += [f"--memory {memory * 1024}"]
         cmds += [f"--score-col-nums 3-{len(df_weight.columns) + 1}"]
         if path.endswith(".pgen"):
             cmds += [f"--pfile {path[:-5]}"]
@@ -142,6 +150,7 @@ def _score_single_plink(
 
         subprocess.check_call(" ".join(cmds), shell=True)
         # read back in
+        # TODO: only read necessary columns
         df_score = pd.read_csv(os.path.join(tmp_dir, "out.sscore"), sep="\t")
     if path.endswith(".pgen"):
         df_score = df_score.set_index(df_score.columns[0])
@@ -159,7 +168,11 @@ def _score_single_plink(
 
 
 def _score_multiple_plink(
-    path_list: List[str], df_weight: pd.DataFrame, weight_cols: List[str]
+    path_list: List[str],
+    df_weight: pd.DataFrame,
+    weight_cols: List[str],
+    n_threads: int,
+    memory: Optional[int] = None,
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
 
     # multiple plink files
@@ -172,9 +185,13 @@ def _score_multiple_plink(
     if merge_dim == "indiv":
         df_score_list = []
         df_snp = None
-        for path in path_list:
+        for path in tqdm(path_list, desc="scoring multiple plink files"):
             df_score, this_df_snp = _score_single_plink(
-                path=path, df_weight=df_weight, weight_cols=weight_cols
+                path=path,
+                df_weight=df_weight,
+                weight_cols=weight_cols,
+                n_threads=n_threads,
+                memory=memory,
             )
             df_score_list.append(df_score)
             if df_snp is None:
@@ -186,9 +203,13 @@ def _score_multiple_plink(
     elif merge_dim == "snp":
         df_score = None
         df_snp_list = []
-        for path in path_list:
+        for path in tqdm(path_list, desc="scoring multiple plink files"):
             this_df_score, df_snp = _score_single_plink(
-                path=path, df_weight=df_weight, weight_cols=weight_cols
+                path=path,
+                df_weight=df_weight,
+                weight_cols=weight_cols,
+                n_threads=n_threads,
+                memory=memory,
             )
             if df_score is None:
                 df_score = this_df_score
@@ -209,6 +230,8 @@ def score(
     df_weight: pd.DataFrame,
     weight_cols: List[str] = None,
     read_freq: bool = False,
+    n_threads: int = 8,
+    memory: Optional[int] = None,
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
     Wrapper for scoring plink files against a pd.DataFrame
@@ -244,10 +267,14 @@ def score(
     path_list = parse_plink_path(plink_path)
     if len(path_list) == 1:
         # single plink file
-        df_score, df_snp = _score_single_plink(path_list[0], df_weight, weight_cols)
+        df_score, df_snp = _score_single_plink(
+            path_list[0], df_weight, weight_cols, n_threads=n_threads, memory=memory
+        )
     elif len(path_list) > 1:
         # multiple plink files
-        df_score, df_snp = _score_multiple_plink(path_list, df_weight, weight_cols)
+        df_score, df_snp = _score_multiple_plink(
+            path_list, df_weight, weight_cols, n_threads=n_threads, memory=memory
+        )
     return df_score, df_snp
 
 
