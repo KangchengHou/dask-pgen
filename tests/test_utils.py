@@ -1,6 +1,7 @@
 import pandas as pd
 import dapgen
 import numpy as np
+from typing import List
 
 
 def test_align_snp():
@@ -28,7 +29,12 @@ def test_align_snp():
     assert np.allclose(flip_sign, [1.0, -1.0, 1.0, 1.0])
 
 
-def python_score(plink_path, df_weight, weight_cols):
+def python_score(
+    plink_path: str,
+    df_weight: pd.DataFrame,
+    weight_cols: List[str],
+    center: bool = False,
+):
     """
     Alternative way of implementing the score with python API, used for testing
     """
@@ -43,6 +49,8 @@ def python_score(plink_path, df_weight, weight_cols):
     df_weight = df_weight.loc[df_weight_idx, weight_cols]
     to_flip = flip_sign == -1
     geno[to_flip, :] = 2.0 - geno[to_flip, :]
+    if center:
+        geno -= geno.mean(axis=1)[:, None]
     true_score = geno.T.dot(df_weight.values)
     return true_score, df_snp
 
@@ -59,6 +67,14 @@ def test_score():
     # full observation
     df_score, df_score_snp = dapgen.score(plink_path, df_weight)
     true_score, true_df_snp = python_score(plink_path, df_weight, weight_cols)
+    assert np.allclose(df_score.values, true_score)
+    assert df_score_snp.equals(true_df_snp)
+
+    # test center
+    df_score, df_score_snp = dapgen.score(plink_path, df_weight, center=True)
+    true_score, true_df_snp = python_score(
+        plink_path, df_weight, weight_cols, center=True
+    )
     assert np.allclose(df_score.values, true_score)
     assert df_score_snp.equals(true_df_snp)
 

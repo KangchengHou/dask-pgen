@@ -1,0 +1,12 @@
+#!/usr/bin/env python
+
+import dapgen
+import fire
+
+
+def score(p):
+    return p[0] * p[1]
+
+
+if __name__ == "__main__":
+    fire.Fire()

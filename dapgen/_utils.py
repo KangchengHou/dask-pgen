@@ -104,6 +104,7 @@ def _score_single_plink(
     df_weight: pd.DataFrame,
     weight_cols: List[str],
     n_threads: int,
+    center: bool,
     memory: Optional[int] = None,
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
@@ -138,10 +139,14 @@ def _score_single_plink(
         cmds = [
             f"{plink2_bin} --score {tmp_dir}/weight.txt 1 2 header-read cols=+scoresums,-scoreavgs"
         ]
+        if center:
+            # append center to --score argument
+            cmds[-1] += " center"
         cmds += [f"--threads {n_threads}"]
         if memory is not None:
             cmds += [f"--memory {memory * 1024}"]
         cmds += [f"--score-col-nums 3-{len(df_weight.columns) + 1}"]
+
         if path.endswith(".pgen"):
             cmds += [f"--pfile {path[:-5]}"]
         elif path.endswith(".bed"):
@@ -150,7 +155,6 @@ def _score_single_plink(
 
         subprocess.check_call(" ".join(cmds), shell=True)
         # read back in
-        # TODO: only read necessary columns
         df_score = pd.read_csv(os.path.join(tmp_dir, "out.sscore"), sep="\t")
     if path.endswith(".pgen"):
         df_score = df_score.set_index(df_score.columns[0])
@@ -172,6 +176,7 @@ def _score_multiple_plink(
     df_weight: pd.DataFrame,
     weight_cols: List[str],
     n_threads: int,
+    center: bool,
     memory: Optional[int] = None,
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
 
@@ -191,6 +196,7 @@ def _score_multiple_plink(
                 df_weight=df_weight,
                 weight_cols=weight_cols,
                 n_threads=n_threads,
+                center=center,
                 memory=memory,
             )
             df_score_list.append(df_score)
@@ -210,6 +216,7 @@ def _score_multiple_plink(
                 weight_cols=weight_cols,
                 n_threads=n_threads,
                 memory=memory,
+                center=center,
             )
             if df_score is None:
                 df_score = this_df_score
@@ -231,6 +238,7 @@ def score(
     weight_cols: List[str] = None,
     read_freq: bool = False,
     n_threads: int = 8,
+    center: bool = False,
     memory: Optional[int] = None,
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
@@ -268,12 +276,22 @@ def score(
     if len(path_list) == 1:
         # single plink file
         df_score, df_snp = _score_single_plink(
-            path_list[0], df_weight, weight_cols, n_threads=n_threads, memory=memory
+            path_list[0],
+            df_weight,
+            weight_cols,
+            n_threads=n_threads,
+            memory=memory,
+            center=center,
         )
     elif len(path_list) > 1:
         # multiple plink files
         df_score, df_snp = _score_multiple_plink(
-            path_list, df_weight, weight_cols, n_threads=n_threads, memory=memory
+            path_list,
+            df_weight,
+            weight_cols,
+            n_threads=n_threads,
+            memory=memory,
+            center=center,
         )
     return df_score, df_snp
 
