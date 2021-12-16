@@ -21,7 +21,7 @@ def score(
 
     dapgen score --plink <plink> --weights <weights> --center <center> --out <out>
     """
-
+    assert center in [True, False], "center must be True or False"
     # parse arguments
     df_weights = pd.read_csv(weights, delim_whitespace=True)
     assert [

@@ -32,7 +32,7 @@ def test_score():
             f"--out {os.path.join(tmp_dir_name, 'score.tsv')}",
         ]
         if center:
-            cmds.append("--center")
+            cmds.append("--center True")
         subprocess.check_call(" ".join(cmds), shell=True)
 
         # # full observation

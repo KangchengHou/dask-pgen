@@ -14,5 +14,5 @@ dapgen score \
     --plink <plink> \
     --weights <weights_path> \
     --out <out_path> \
-    --center # center the genotype or not
+    --center True # center the genotype or not, default is False
 ```
