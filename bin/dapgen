@@ -4,17 +4,20 @@ import dapgen
 import fire
 import pandas as pd
 import numpy as np
+from typing import Optional
 
 
 def score(
     plink: str,
     weights: str,
     out: str,
+    freq_suffix: Optional[str] = None,
     center: bool = False,
     chrom_col: str = "CHROM",
     pos_col: str = "POS",
     ref_col: str = "REF",
     alt_col: str = "ALT",
+    memory: Optional[int] = None,
 ):
     """
     Command line interface for dapgen.score
@@ -24,9 +27,9 @@ def score(
     assert center in [True, False], "center must be True or False"
     # parse arguments
     df_weights = pd.read_csv(weights, delim_whitespace=True)
-    assert [
-        col in df_weights.columns for col in [chrom_col, pos_col, ref_col, alt_col]
-    ], "weights file must have columns CHROM:{chrom_col}, POS:{pos_col}, REF:{ref_col}, and ALT:{alt_col}"
+    assert np.all(
+        [col in df_weights.columns for col in [chrom_col, pos_col, ref_col, alt_col]]
+    ), "weights file must have columns CHROM:{chrom_col}, POS:{pos_col}, REF:{ref_col}, ALT:{alt_col}"
 
     # rename columns to their prespecified names
     df_weights.rename(
@@ -48,6 +51,8 @@ def score(
         df_weights=df_weights,
         weight_cols=weight_cols,
         center=center,
+        memory=memory,
+        freq_suffix=freq_suffix,
     )
     df_score.to_csv(out, sep="\t")
 
