@@ -24,4 +24,5 @@ setup(
         "natsort",
         "pgenlib @ git+https://github.com/chrchang/plink-ng.git#egg=pgenlib&subdirectory=2.0/Python",
     ],
+    scripts=["bin/dapgen"],
 )

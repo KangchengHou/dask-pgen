@@ -234,7 +234,7 @@ def _score_multiple_plink(
 
 def score(
     plink_path: str,
-    df_weight: pd.DataFrame,
+    df_weights: pd.DataFrame,
     weight_cols: List[str] = None,
     read_freq: bool = False,
     n_threads: int = 8,
@@ -244,7 +244,7 @@ def score(
     """
     Wrapper for scoring plink files against a pd.DataFrame
 
-    CHROM, POS, REF, ALT columns must be present in df_weight and will be used to align
+    CHROM, POS, REF, ALT columns must be present in df_weights and will be used to align
     with the plink file.
 
     All other numerical columns will be used as input for scoring.
@@ -261,13 +261,13 @@ def score(
     # TODO: freq path must be plink_path.freq??
     assert read_freq == False, "read-in freq is not supported yet"
     # basic checks on df_weight
-    assert np.all([col in df_weight.columns for col in ["CHROM", "POS", "REF", "ALT"]])
+    assert np.all([col in df_weights.columns for col in ["CHROM", "POS", "REF", "ALT"]])
 
     if weight_cols is None:
         # get numerical columns except for CHROM, POS, REF, ALT
         weight_cols = [
             col
-            for col in df_weight.select_dtypes(include=np.number).columns
+            for col in df_weights.select_dtypes(include=np.number).columns
             if col not in ["CHROM", "POS", "REF", "ALT"]
         ]
 
@@ -277,7 +277,7 @@ def score(
         # single plink file
         df_score, df_snp = _score_single_plink(
             path_list[0],
-            df_weight,
+            df_weights,
             weight_cols,
             n_threads=n_threads,
             memory=memory,
@@ -287,7 +287,7 @@ def score(
         # multiple plink files
         df_score, df_snp = _score_multiple_plink(
             path_list,
-            df_weight,
+            df_weights,
             weight_cols,
             n_threads=n_threads,
             memory=memory,

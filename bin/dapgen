@@ -2,10 +2,54 @@
 
 import dapgen
 import fire
+import pandas as pd
+import numpy as np
 
 
-def score(p):
-    return p[0] * p[1]
+def score(
+    plink: str,
+    weights: str,
+    out: str,
+    center: bool = False,
+    chrom_col: str = "CHROM",
+    pos_col: str = "POS",
+    ref_col: str = "REF",
+    alt_col: str = "ALT",
+):
+    """
+    Command line interface for dapgen.score
+
+    dapgen score --plink <plink> --weights <weights> --center <center> --out <out>
+    """
+
+    # parse arguments
+    df_weights = pd.read_csv(weights, delim_whitespace=True)
+    assert [
+        col in df_weights.columns for col in [chrom_col, pos_col, ref_col, alt_col]
+    ], "weights file must have columns CHROM:{chrom_col}, POS:{pos_col}, REF:{ref_col}, and ALT:{alt_col}"
+
+    # rename columns to their prespecified names
+    df_weights.rename(
+        columns={chrom_col: "CHROM", pos_col: "POS", ref_col: "REF", alt_col: "ALT"},
+        inplace=True,
+    )
+
+    weight_cols = [
+        col
+        for col in df_weights.select_dtypes(include=np.number).columns
+        if col not in ["CHROM", "POS", "REF", "ALT"]
+    ]
+    print(f"inferred columns used for scoring: {','.join(weight_cols)}")
+    assert len(weight_cols) > 0, "weights file must have numeric columns"
+
+    # run
+    df_score, df_snp = dapgen.score(
+        plink_path=plink,
+        df_weights=df_weights,
+        weight_cols=weight_cols,
+        center=center,
+    )
+    df_score.to_csv(out, sep="\t")
 
 
 if __name__ == "__main__":
