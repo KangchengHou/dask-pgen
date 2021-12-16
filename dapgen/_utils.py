@@ -105,6 +105,7 @@ def _score_single_plink(
     weight_cols: List[str],
     n_threads: int,
     center: bool,
+    freq_suffix: Optional[str],
     memory: Optional[int] = None,
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
@@ -148,9 +149,16 @@ def _score_single_plink(
         cmds += [f"--score-col-nums 3-{len(df_weight.columns) + 1}"]
 
         if path.endswith(".pgen"):
-            cmds += [f"--pfile {path[:-5]}"]
+            prefix = path[:-5]
+            cmds += [f"--pfile {prefix}"]
         elif path.endswith(".bed"):
+            prefix = path[:-4]
             cmds += [f"--bfile {path[:-4]}"]
+
+        # specify frequency file if available
+        if freq_suffix is not None:
+            cmds += [f"--read-freq {prefix + freq_suffix}"]
+
         cmds += [f"--out {tmp_dir}/out"]
 
         subprocess.check_call(" ".join(cmds), shell=True)
@@ -177,6 +185,7 @@ def _score_multiple_plink(
     weight_cols: List[str],
     n_threads: int,
     center: bool,
+    freq_suffix: Optional[str],
     memory: Optional[int] = None,
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
 
@@ -198,6 +207,7 @@ def _score_multiple_plink(
                 n_threads=n_threads,
                 center=center,
                 memory=memory,
+                freq_suffix=freq_suffix,
             )
             df_score_list.append(df_score)
             if df_snp is None:
@@ -217,6 +227,7 @@ def _score_multiple_plink(
                 n_threads=n_threads,
                 memory=memory,
                 center=center,
+                freq_suffix=freq_suffix,
             )
             if df_score is None:
                 df_score = this_df_score
@@ -236,10 +247,10 @@ def score(
     plink_path: str,
     df_weights: pd.DataFrame,
     weight_cols: List[str] = None,
-    read_freq: bool = False,
     n_threads: int = 8,
     center: bool = False,
     memory: Optional[int] = None,
+    freq_suffix: Optional[str] = None,
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
     Wrapper for scoring plink files against a pd.DataFrame
@@ -257,9 +268,9 @@ def score(
         Dataframe containing weights
     out : str
         Path to output file
+    freq_suffix : str
+        if provided, every plink file [plink] must be associated with a [plink].[freq_suffix] file
     """
-    # TODO: freq path must be plink_path.freq??
-    assert read_freq == False, "read-in freq is not supported yet"
     # basic checks on df_weight
     assert np.all([col in df_weights.columns for col in ["CHROM", "POS", "REF", "ALT"]])
 
@@ -282,6 +293,7 @@ def score(
             n_threads=n_threads,
             memory=memory,
             center=center,
+            freq_suffix=freq_suffix,
         )
     elif len(path_list) > 1:
         # multiple plink files
@@ -292,6 +304,7 @@ def score(
             n_threads=n_threads,
             memory=memory,
             center=center,
+            freq_suffix=freq_suffix,
         )
     return df_score, df_snp
 

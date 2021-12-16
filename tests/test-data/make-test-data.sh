@@ -50,6 +50,11 @@ for pop in GBR FIN; do
         --make-pgen --out plink2.merged.${pop}
 done
 
+plink2 \
+    --pfile plink2.merged \
+    --freq \
+    --out plink2.merged
+
 # clean up
 rm indiv.txt
 rm *.zst
