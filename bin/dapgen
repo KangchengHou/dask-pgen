@@ -29,7 +29,10 @@ def score(
     df_weights = pd.read_csv(weights, delim_whitespace=True)
     assert np.all(
         [col in df_weights.columns for col in [chrom_col, pos_col, ref_col, alt_col]]
-    ), "weights file must have columns CHROM:{chrom_col}, POS:{pos_col}, REF:{ref_col}, ALT:{alt_col}"
+    ), (
+        "weights file must have these columns "
+        f"CHROM:{chrom_col}, POS:{pos_col}, REF:{ref_col}, ALT:{alt_col}"
+    )
 
     # rename columns to their prespecified names
     df_weights.rename(
