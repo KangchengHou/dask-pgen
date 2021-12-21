@@ -57,7 +57,7 @@ def score(
         memory=memory,
         freq_suffix=freq_suffix,
     )
-    df_score.to_csv(out, sep="\t")
+    df_score.to_csv(out, sep="\t", float_format="%.6f")
 
 
 if __name__ == "__main__":
