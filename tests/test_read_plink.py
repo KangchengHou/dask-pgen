@@ -47,3 +47,24 @@ def test_two_indiv():
             geno1[:, df_indiv1.Population == pop],
             geno2[:, df_indiv2.Population == pop],
         )
+
+
+def test_write_consistency():
+    path = dapgen.get_test_data("plink2.merged.pgen")
+    import tempfile
+
+    tmp_dir = tempfile.TemporaryDirectory()
+    tmp_path = tmp_dir.name + "/tmp.pgen"
+
+    # write phased pgen
+    geno1 = dapgen.read_pgen(path, phase=True)
+    dapgen.write_pgen(tmp_path, geno1)
+    geno2 = dapgen.read_pgen(tmp_path, phase=True)
+    assert np.allclose(geno1, geno2).compute()
+
+    # write unphased pgen
+    dapgen.write_pgen(tmp_path, geno1[:, :, 0] + geno1[:, :, 1])
+    geno2 = dapgen.read_pgen(tmp_path, phase=True)
+    assert not np.allclose(geno1, geno2).compute()
+    assert np.allclose(geno1.sum(axis=2), geno2.sum(axis=2)).compute()
+    tmp_dir.cleanup()
