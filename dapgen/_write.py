@@ -69,7 +69,7 @@ def write_pvar(path: str, df_pvar: pd.DataFrame, header: List[str] = None):
         FIXED_COLS + [col for col in df_pvar.columns if col not in FIXED_COLS]
     ]
     with open(path, "a") as f:
-        if header is not None:
-            assert [h.startswith("#") for h in header]
+        if (header is not None) and len(header) > 0:
+            assert np.all([h.startswith("#") for h in header])
             f.writelines("\n".join(header))
         df_pvar.to_csv(f, sep="\t", index=False)
