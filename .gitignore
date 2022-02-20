@@ -6,3 +6,4 @@ __pycache__/
 *.egg-info/
 .ipynb_checkpoints/
 .mypy_cache/
+.DS_Store

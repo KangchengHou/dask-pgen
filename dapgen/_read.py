@@ -385,10 +385,22 @@ def read_fam(path: str):
     return df
 
 
-def read_pvar(path):
+def read_pvar(path: str, return_header: bool = False):
+    """
+    Read pvar file
+
+    Parameters
+    ----------
+    path : str
+        Path to pvar file, e.g. /path/to/file.pvar
+    return_header : bool
+        If True, return header (commented line starting with #) as a list of strings
+    """
+    header = []
     skiprows = 0
     with open(path) as f:
         for line in f:
+            header.append(line.strip())
             if line.startswith("#CHROM"):
                 break
             skiprows += 1
@@ -402,7 +414,10 @@ def read_pvar(path):
         ["CHROM", "POS", "REF", "ALT"], df_pvar.columns
     ).all(), "pvar file must have columns CHROM, POS, SNP, REF, and ALT"
 
-    return df_pvar
+    if return_header:
+        return df_pvar, header
+    else:
+        return df_pvar
 
 
 def read_psam(path):
