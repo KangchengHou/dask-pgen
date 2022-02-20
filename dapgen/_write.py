@@ -1,6 +1,8 @@
 import numpy as np
 import pgenlib
 import dask.array as da
+import pandas as pd
+from typing import List
 
 
 def write_pgen(path: str, geno: da.Array):
@@ -43,3 +45,31 @@ def write_pgen(path: str, geno: da.Array):
             hardcall_phase_present=False,
         ) as writer:
             writer.append_biallelic_batch(geno.astype(np.int8).compute())
+
+
+def write_pvar(path: str, df_pvar: pd.DataFrame, header: List[str] = None):
+    """
+    Write a pvar file. pvar must starts with #CHROM, snp index will be turned into ID,
+    and have CHROM, POS, REF, ALT
+
+    Parameters
+    ----------
+    path : str
+        Path to write the pvar file to.
+    pvar : pd.DataFrame
+        pvar data to write. pvar has shape (n_snp, n_attr)
+    header : List[str]
+        Header of the pvar file. Each line must start with #
+    """
+    # write df_snp
+    df_pvar = df_pvar.reset_index().rename(columns={"snp": "ID", "CHROM": "#CHROM"})
+
+    FIXED_COLS = ["#CHROM", "POS", "ID", "REF", "ALT"]
+    df_pvar = df_pvar[
+        FIXED_COLS + [col for col in df_pvar.columns if col not in FIXED_COLS]
+    ]
+    with open(path, "a") as f:
+        if header is not None:
+            assert [h.startswith("#") for h in header]
+            f.writelines("\n".join(header))
+        df_pvar.to_csv(f, sep="\t", index=False)

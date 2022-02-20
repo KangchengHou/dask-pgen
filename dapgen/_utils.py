@@ -72,9 +72,11 @@ def get_dependency(name, download=True):
 
             if name == "plink2":
                 if platform == "darwin":
-                    url = "https://s3.amazonaws.com/plink2-assets/alpha2/plink2_mac.zip"
+                    url = (
+                        "https://s3.amazonaws.com/plink2-assets/plink2_mac_20220217.zip"
+                    )
                 elif platform == "linux":
-                    url = "https://s3.amazonaws.com/plink2-assets/plink2_linux_x86_64_20211217.zip"
+                    url = "https://s3.amazonaws.com/plink2-assets/plink2_linux_x86_64_20220217.zip"
                 else:
                     raise ValueError(f"Unsupported platform {platform}")
 
