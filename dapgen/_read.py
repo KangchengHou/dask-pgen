@@ -400,9 +400,9 @@ def read_pvar(path: str, return_header: bool = False):
     skiprows = 0
     with open(path) as f:
         for line in f:
-            header.append(line.strip())
             if line.startswith("#CHROM"):
                 break
+            header.append(line.strip())
             skiprows += 1
 
     df_pvar = (
