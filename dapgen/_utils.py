@@ -108,6 +108,7 @@ def _score_single_plink(
     n_threads: int,
     center: bool,
     freq_suffix: Optional[str],
+    keep: str = None,
     memory: Optional[int] = None,
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
@@ -148,6 +149,8 @@ def _score_single_plink(
         cmds += [f"--threads {n_threads}"]
         if memory is not None:
             cmds += [f"--memory {memory * 1024}"]
+        if keep is not None:
+            cmds += [f"--keep {keep}"]
         cmds += [f"--score-col-nums 3-{len(df_weight.columns) + 1}"]
 
         if path.endswith(".pgen"):
@@ -188,6 +191,7 @@ def _score_multiple_plink(
     n_threads: int,
     center: bool,
     freq_suffix: Optional[str],
+    keep: str = None,
     memory: Optional[int] = None,
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
 
@@ -209,6 +213,7 @@ def _score_multiple_plink(
                 n_threads=n_threads,
                 center=center,
                 memory=memory,
+                keep=keep,
                 freq_suffix=freq_suffix,
             )
             df_score_list.append(df_score)
@@ -229,6 +234,7 @@ def _score_multiple_plink(
                 n_threads=n_threads,
                 memory=memory,
                 center=center,
+                keep=keep,
                 freq_suffix=freq_suffix,
             )
             if df_score is None:
@@ -252,6 +258,7 @@ def score(
     n_threads: int = 8,
     center: bool = False,
     memory: Optional[int] = None,
+    keep: str = None,
     freq_suffix: Optional[str] = None,
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
@@ -295,6 +302,7 @@ def score(
             n_threads=n_threads,
             memory=memory,
             center=center,
+            keep=keep,
             freq_suffix=freq_suffix,
         )
     elif len(path_list) > 1:
@@ -306,6 +314,7 @@ def score(
             n_threads=n_threads,
             memory=memory,
             center=center,
+            keep=keep,
             freq_suffix=freq_suffix,
         )
     return df_score, df_snp

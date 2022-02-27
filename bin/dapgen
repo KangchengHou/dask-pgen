@@ -18,6 +18,7 @@ def score(
     ref_col: str = "REF",
     alt_col: str = "ALT",
     memory: Optional[int] = None,
+    keep: str = None,
 ):
     """
     Command line interface for dapgen.score
@@ -55,6 +56,7 @@ def score(
         weight_cols=weight_cols,
         center=center,
         memory=memory,
+        keep=keep,
         freq_suffix=freq_suffix,
     )
     df_score.to_csv(out, sep="\t", float_format="%.6f")
