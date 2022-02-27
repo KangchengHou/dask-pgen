@@ -5,27 +5,35 @@ import fire
 import pandas as pd
 import numpy as np
 from typing import Optional
+import structlog
+
+log = structlog.get_logger()
 
 
 def score(
     plink: str,
     weights: str,
     out: str,
+    weight_col_prefix: str = None,
     freq_suffix: Optional[str] = None,
     center: bool = False,
     chrom_col: str = "CHROM",
     pos_col: str = "POS",
     ref_col: str = "REF",
     alt_col: str = "ALT",
-    memory: Optional[int] = None,
-    keep: str = None,
+    **kwargs,
 ):
     """
     Command line interface for dapgen.score
 
     dapgen score --plink <plink> --weights <weights> --center <center> --out <out>
     """
+    log.info(
+        f"Received parameters: \ndapgen score\n  "
+        + "\n  ".join(f"--{k}={v}" for k, v in locals().items())
+    )
     assert center in [True, False], "center must be True or False"
+    log.info(f"Reading weights from {weights}")
     # parse arguments
     df_weights = pd.read_csv(weights, delim_whitespace=True)
     assert np.all(
@@ -40,13 +48,20 @@ def score(
         columns={chrom_col: "CHROM", pos_col: "POS", ref_col: "REF", alt_col: "ALT"},
         inplace=True,
     )
+    if weight_col_prefix is None:
+        weight_cols = [
+            col
+            for col in df_weights.select_dtypes(include=np.number).columns
+            if col not in ["CHROM", "POS", "REF", "ALT"]
+        ]
+    else:
+        weight_cols = [
+            col
+            for col in df_weights.select_dtypes(include=np.number).columns
+            if col.startswith(weight_col_prefix)
+        ]
 
-    weight_cols = [
-        col
-        for col in df_weights.select_dtypes(include=np.number).columns
-        if col not in ["CHROM", "POS", "REF", "ALT"]
-    ]
-    print(f"inferred columns used for scoring: {','.join(weight_cols)}")
+    log.info(f"{len(df_weights)} rows x {len(weight_cols)} columns used for scoring...")
     assert len(weight_cols) > 0, "weights file must have numeric columns"
 
     # run
@@ -55,9 +70,8 @@ def score(
         df_weights=df_weights,
         weight_cols=weight_cols,
         center=center,
-        memory=memory,
-        keep=keep,
         freq_suffix=freq_suffix,
+        **kwargs,
     )
     df_score.to_csv(out, sep="\t", float_format="%.6f")
 

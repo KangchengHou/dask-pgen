@@ -73,10 +73,10 @@ def get_dependency(name, download=True):
             if name == "plink2":
                 if platform == "darwin":
                     url = (
-                        "https://s3.amazonaws.com/plink2-assets/plink2_mac_20220217.zip"
+                        "https://s3.amazonaws.com/plink2-assets/plink2_mac_20220223.zip"
                     )
                 elif platform == "linux":
-                    url = "https://s3.amazonaws.com/plink2-assets/plink2_linux_x86_64_20220217.zip"
+                    url = "https://s3.amazonaws.com/plink2-assets/plink2_linux_x86_64_20220223.zip"
                 else:
                     raise ValueError(f"Unsupported platform {platform}")
 
@@ -105,11 +105,9 @@ def _score_single_plink(
     path: str,
     df_weight: pd.DataFrame,
     weight_cols: List[str],
-    n_threads: int,
     center: bool,
     freq_suffix: Optional[str],
-    keep: str = None,
-    memory: Optional[int] = None,
+    **kwargs,
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
     Score a single plink file against a pd.DataFrame
@@ -146,11 +144,11 @@ def _score_single_plink(
         if center:
             # append center to --score argument
             cmds[-1] += " center"
-        cmds += [f"--threads {n_threads}"]
-        if memory is not None:
-            cmds += [f"--memory {memory * 1024}"]
-        if keep is not None:
-            cmds += [f"--keep {keep}"]
+
+        # keyword arguments
+        add_cmds = [f" --{k.replace('_', '-')} {kwargs[k]}" for k in kwargs]
+        cmds += add_cmds
+
         cmds += [f"--score-col-nums 3-{len(df_weight.columns) + 1}"]
 
         if path.endswith(".pgen"):
@@ -167,6 +165,7 @@ def _score_single_plink(
         cmds += [f"--out {tmp_dir}/out"]
 
         subprocess.check_call(" ".join(cmds), shell=True)
+
         # read back in
         df_score = pd.read_csv(os.path.join(tmp_dir, "out.sscore"), sep="\t")
     if path.endswith(".pgen"):
@@ -224,11 +223,9 @@ def _score_multiple_plink(
     path_list: List[str],
     df_weight: pd.DataFrame,
     weight_cols: List[str],
-    n_threads: int,
     center: bool,
     freq_suffix: Optional[str],
-    keep: str = None,
-    memory: Optional[int] = None,
+    **kwargs,
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
 
     # multiple plink files
@@ -246,11 +243,9 @@ def _score_multiple_plink(
                 path=path,
                 df_weight=df_weight,
                 weight_cols=weight_cols,
-                n_threads=n_threads,
                 center=center,
-                memory=memory,
-                keep=keep,
                 freq_suffix=freq_suffix,
+                **kwargs,
             )
             df_score_list.append(df_score)
             if df_snp is None:
@@ -267,11 +262,9 @@ def _score_multiple_plink(
                 path=path,
                 df_weight=df_weight,
                 weight_cols=weight_cols,
-                n_threads=n_threads,
-                memory=memory,
                 center=center,
-                keep=keep,
                 freq_suffix=freq_suffix,
+                **kwargs,
             )
             if df_score is None:
                 df_score = this_df_score
@@ -291,11 +284,9 @@ def score(
     plink_path: str,
     df_weights: pd.DataFrame,
     weight_cols: List[str] = None,
-    n_threads: int = 8,
     center: bool = False,
-    memory: Optional[int] = None,
-    keep: str = None,
     freq_suffix: Optional[str] = None,
+    **kwargs,
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
     Wrapper for scoring plink files against a pd.DataFrame
@@ -335,11 +326,9 @@ def score(
             path_list[0],
             df_weights,
             weight_cols,
-            n_threads=n_threads,
-            memory=memory,
             center=center,
-            keep=keep,
             freq_suffix=freq_suffix,
+            **kwargs,
         )
     elif len(path_list) > 1:
         # multiple plink files
@@ -347,11 +336,9 @@ def score(
             path_list,
             df_weights,
             weight_cols,
-            n_threads=n_threads,
-            memory=memory,
             center=center,
-            keep=keep,
             freq_suffix=freq_suffix,
+            **kwargs,
         )
     return df_score, df_snp
 
@@ -407,6 +394,7 @@ def align_snp(
         on=["CHROM", "POS"],
         suffixes=["1", "2"],
     )
+    assert len(df_merged) > 0, "df1 and df2 must contain at least one common SNP"
     noflip_index = (df_merged["REF1"] == df_merged["REF2"]) & (
         df_merged["ALT1"] == df_merged["ALT2"]
     )
