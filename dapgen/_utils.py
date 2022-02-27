@@ -184,6 +184,42 @@ def _score_single_plink(
     return df_score, df_snp
 
 
+def freq(plink_path: str, memory: Optional[int] = None) -> pd.DataFrame:
+    """Calculate the frequency
+
+    Parameters
+    ----------
+    plink_path : str
+        path to the plink file
+    memory: int
+        memory constraint.
+
+    Returns
+    -------
+    pd.DataFrame
+        with columns #CHROM ID REF ALT ALT_FREQS OBS_CT
+    """
+    plink2_bin = get_dependency("plink2")
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        cmds = [f"{plink2_bin} --freq --out {tmp_dir}/freq"]
+        if memory is not None:
+            cmds += [f"--memory {memory * 1024}"]
+
+        if plink_path.endswith(".pgen"):
+            prefix = plink_path[:-5]
+            cmds += [f"--pfile {prefix}"]
+        elif plink_path.endswith(".bed"):
+            prefix = plink_path[:-4]
+            cmds += [f"--bfile {plink_path[:-4]}"]
+
+        subprocess.check_call(" ".join(cmds), shell=True)
+
+        # read back in
+        df_freq = pd.read_csv(os.path.join(tmp_dir, "freq.afreq"), sep="\t")
+
+    return df_freq
+
+
 def _score_multiple_plink(
     path_list: List[str],
     df_weight: pd.DataFrame,
