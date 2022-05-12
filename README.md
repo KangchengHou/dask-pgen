@@ -18,6 +18,10 @@ cd dask-pgen; pip install -e .
 dapgen score \
     --plink <plink> \
     --weights <weights_path> \
+    --weight-col-prefix <weight_column_prefix> \
+    --chrom-col CHR --pos-col POS --alt-col A1 --ref-col A2 \
     --out <out_path> \
-    --center True # center the genotype or not, default is False
+    --center True # center the genotype or not, default is False \
+    --threads 4 \
+    --memory 20000
 ```
