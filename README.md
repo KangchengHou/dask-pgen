@@ -10,6 +10,11 @@ cd dask-pgen; pip install -e .
 
 # Example
 ```bash
+# if dapgen is not found, set the path of dapgen yourself
+# chmod +x dask-pgen/bin/dapgen
+# dapgen=dask-pgen/bin/dapgen
+# replace "dapgen" with "$dapgen"
+
 dapgen score \
     --plink <plink> \
     --weights <weights_path> \
