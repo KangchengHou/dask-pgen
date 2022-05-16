@@ -433,5 +433,6 @@ def read_psam(path):
         .rename(columns={"#IID": "indiv"})
         .set_index("indiv")
     )
+    df_psam.index = df_psam.index.astype(str)
 
     return df_psam
