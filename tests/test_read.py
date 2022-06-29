@@ -41,10 +41,6 @@ def test_benchmark_dapgen_plink2_phase(benchmark):
     benchmark(dset.compute)
 
 
-# TODO: download some large plink1 data sets
-# benchmark between pandas_plink and dapgen
-
-
 # def test_benchmark_dapgen_plink2_no_phase(benchmark):
 #     path = dapgen.get_test_data("1000G.EUR.QC.22.pgen")
 #     dset = dapgen.read_pgen(path, phase=False)

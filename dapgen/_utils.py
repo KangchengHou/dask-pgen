@@ -5,11 +5,9 @@ import tempfile
 import os
 import subprocess
 import shutil
-import dapgen
 import os
 from contextlib import contextmanager
 import os
-import urllib.request
 from tqdm import tqdm
 from ._read import read_pvar, read_bim, parse_plink_path, infer_merge_dim
 
@@ -24,18 +22,6 @@ def cd(newdir):
         os.chdir(prevdir)
 
 
-def get_cache_dir() -> str:
-    """Get the cache directory for admix-kit
-    Returns
-    -------
-    [type]
-        [description]
-    """
-    cache_dir = os.path.join(os.path.dirname(dapgen.__file__), "../.dapgen_cache")
-    os.makedirs(cache_dir, exist_ok=True)
-    return cache_dir
-
-
 def get_dependency(name, download=True):
 
     """Get path to an depenency
@@ -44,7 +30,6 @@ def get_dependency(name, download=True):
     - package installment directory admix-tools/.admix_cache/bin/<name>
     If not found in any of these locations, download the corresponding software package
     - plink: https://www.cog-genomics.org/plink/2.0/
-    - gcta: https://github.com/gcta/gcta
     Parameters
     ----------
     download : bool
@@ -53,50 +38,16 @@ def get_dependency(name, download=True):
     -------
     Path to binary executable
     """
-    from os.path import join
 
     # find in path
     if shutil.which(name):
         return shutil.which(name)
-
-    # find in cache
-    cache_dir = join(get_cache_dir(), "bin")
-    os.makedirs(cache_dir, exist_ok=True)
-    cache_bin_path = join(cache_dir, name)
-    if shutil.which(cache_bin_path):
-        return cache_bin_path
     else:
-        # download
-        if download:
-            from sys import platform
-
-            if name == "plink2":
-                if platform == "darwin":
-                    url = "https://s3.amazonaws.com/plink2-assets/alpha3/plink2_mac_20220603.zip"
-                elif platform == "linux":
-                    url = "https://s3.amazonaws.com/plink2-assets/alpha3/plink2_linux_x86_64_20220603.zip"
-                else:
-                    raise ValueError(f"Unsupported platform {platform}")
-
-                with tempfile.TemporaryDirectory() as tmp_dir:
-                    with cd(tmp_dir):
-                        urllib.request.urlretrieve(
-                            url,
-                            "file.zip",
-                        )
-                        subprocess.check_call(f"unzip file.zip -d dir", shell=True)
-                        subprocess.check_call(
-                            f"mv dir/plink2 {cache_bin_path}", shell=True
-                        )
-            else:
-                raise ValueError(f"Unsupported software {name}")
-
-        else:
-            raise ValueError(
-                f"{name} not found in $PATH or {cache_dir}, set `download=True` to download from website"
-            )
-
-        return cache_bin_path
+        raise ValueError(
+            f"{name} not found in PATH. "
+            "Download plink2 (https://www.cog-genomics.org/plink/2.0/) "
+            "and put it in the PATH"
+        )
 
 
 def _score_single_plink(
