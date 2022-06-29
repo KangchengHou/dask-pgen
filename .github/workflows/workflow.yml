@@ -20,7 +20,8 @@ jobs:
         pip install --upgrade cython numpy flake8 pytest pytest-benchmark pandas_plink
         pip install -e .
         curl -L -o plink2.zip "https://s3.amazonaws.com/plink2-assets/alpha3/plink2_linux_x86_64_20220519.zip" && \
-        unzip plink2.zip && mv plink2 /bin/plink2
+        unzip plink2.zip && echo "${PWD}/plink2" >> $GITHUB_PATH
+        echo $GITHUB_PATH
     - name: Lint with flake8
       run: |
         # stop the build if there are Python syntax errors or undefined names
