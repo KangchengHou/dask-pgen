@@ -22,6 +22,7 @@ jobs:
         curl -L -o plink2.zip "https://s3.amazonaws.com/plink2-assets/alpha3/plink2_linux_x86_64_20220519.zip" && unzip plink2.zip
         mkdir -p $GITHUB_WORKSPACE/bin
         mv plink2 $GITHUB_WORKSPACE/bin/plink2
+        echo "::add-path::$GITHUB_WORKSPACE/bin"
         echo $GITHUB_WORKSPACE
     - name: Lint with flake8
       run: |
