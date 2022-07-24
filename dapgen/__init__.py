@@ -1,6 +1,13 @@
 __version__ = "0.1"
 
-from ._read import read_pfile, read_pgen, read_pvar, read_psam, read_plink
+from ._read import (
+    read_pfile,
+    read_pgen,
+    read_pvar,
+    read_psam,
+    read_plink,
+    parse_plink_path,
+)
 from ._data import get_test_data
 from ._utils import align_snp, score, freq
 from ._write import write_pgen, write_pvar
