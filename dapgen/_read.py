@@ -148,19 +148,15 @@ def parse_plink_path(pathname: Union[str, List]) -> List[str]:
         # already a list of paths
         out = pathname
     elif isinstance(pathname, str):
-        if pathname.endswith(".bed") or pathname.endswith(".pgen"):
-            out = [pathname]
-        elif pathname.endswith(".txt"):
-            # pattern is a file with a list of files
-            with open(pathname, "r") as f:
-                out = [line.strip() for line in f]
-        elif "*" in pathname:
-            # pattern is a file pattern
+        if ("*" in pathname) or os.path.isdir(pathname):
             # find all files matching the pattern
-            out = glob.glob(pathname)
-        # pathname is a directory
-        elif os.path.isdir(pathname):
-            out = glob.glob(pathname + "/*")
+            if "*" in pathname:
+                # pattern is a file pattern
+                out = glob.glob(pathname)
+            elif os.path.isdir(pathname):
+                # pathname is a directory
+                out = out = glob.glob(pathname + "/*")
+
             pgen_list = [p for p in out if p.endswith(".pgen")]
             bed_list = [p for p in out if p.endswith(".bed")]
             assert (len(pgen_list) > 0) != (
@@ -176,6 +172,12 @@ def parse_plink_path(pathname: Union[str, List]) -> List[str]:
                     " but not both"
                 )
             out = natsorted(out)
+        elif pathname.endswith(".bed") or pathname.endswith(".pgen"):
+            out = [pathname]
+        elif pathname.endswith(".txt"):
+            # pattern is a file with a list of files
+            with open(pathname, "r") as f:
+                out = [line.strip() for line in f]
         else:
             raise ValueError("Unable to parse plink pathname")
 
