@@ -362,8 +362,8 @@ def align_snp(
     flip_sign = df_merged.loc[noflip_index | flip_index, "flip_sign"].values
 
     if enforce_order:
-        df1_loc = df1.index.get_loc(df1_idx)
-        df2_loc = df2.index.get_loc(df2_idx)
+        df1_loc = df1.index.get_indexer(df1_idx)
+        df2_loc = df2.index.get_indexer(df2_idx)
         assert (df1_loc[0] == 0) & (df2_loc[0] == 0), "1st element must appears first"
         mask1 = np.concatenate([[True], df1_loc[1:] > df1_loc[:-1]])
         mask2 = np.concatenate([[True], df2_loc[1:] > df2_loc[:-1]])
