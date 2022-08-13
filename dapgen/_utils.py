@@ -293,7 +293,7 @@ def score(
 
 
 def align_snp(
-    df1: pd.DataFrame, df2: pd.DataFrame, enforce_order: bool = False
+    df1: pd.DataFrame, df2: pd.DataFrame
 ) -> Tuple[pd.Index, pd.Index, np.ndarray]:
     """
     Align two SNP dataframes by SNP, CHROM, POS, with the following 3 steps:
@@ -313,10 +313,6 @@ def align_snp(
         Dataframe 1 containing CHROM, POS, REF, ALT
     df2 : pd.DataFrame
         Dataframe 2 containing CHROM, POS, REF, ALT
-    enforce_order : bool
-        If True, enforce that the returned snp index must follow the same order as in
-        df1 and df2. That is df1_idx appears in order in df1, df2_idx appears in order
-        in df2. Those SNP indices that are not in order will not be returned.
 
     Returns
     -------
@@ -360,16 +356,5 @@ def align_snp(
     df1_idx = pd.Index(df_merged.loc[noflip_index | flip_index, "ID1"].values)
     df2_idx = pd.Index(df_merged.loc[noflip_index | flip_index, "ID2"].values)
     flip_sign = df_merged.loc[noflip_index | flip_index, "flip_sign"].values
-
-    if enforce_order:
-        df1_loc = df1.index.get_indexer(df1_idx)
-        df2_loc = df2.index.get_indexer(df2_idx)
-        assert (df1_loc[0] == 0) & (df2_loc[0] == 0), "1st element must appears first"
-        mask1 = np.concatenate([[True], df1_loc[1:] > df1_loc[:-1]])
-        mask2 = np.concatenate([[True], df2_loc[1:] > df2_loc[:-1]])
-        mask = mask1 & mask2
-        df1_idx = df1_idx[mask]
-        df2_idx = df2_idx[mask]
-        flip_sign = flip_sign[mask]
 
     return df1_idx, df2_idx, flip_sign
