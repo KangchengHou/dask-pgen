@@ -98,7 +98,11 @@ def _score_single_plink(
         add_cmds = [f" --{k.replace('_', '-')} {kwargs[k]}" for k in kwargs]
         cmds += add_cmds
 
-        cmds += [f"--score-col-nums 3-{len(df_weight.columns) + 1}"]
+        max_weight_col = len(df_weight.columns) + 1
+        if max_weight_col > 3:
+            cmds += [f"--score-col-nums 3-{max_weight_col}"]
+        else:
+            cmds += [f"--score-col-nums 3"]
 
         if path.endswith(".pgen"):
             prefix = path[:-5]
