@@ -5,6 +5,8 @@ from ._read import (
     read_pgen,
     read_pvar,
     read_psam,
+    read_bim,
+    read_fam,
     read_plink,
     parse_plink_path,
 )
