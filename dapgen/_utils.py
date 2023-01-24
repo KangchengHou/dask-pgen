@@ -290,7 +290,9 @@ def score(
     return df_score, df_snp
 
 
-def align_snp(df1: pd.DataFrame, df2: pd.DataFrame) -> Tuple[pd.Index, pd.Index, np.ndarray]:
+def align_snp(
+    df1: pd.DataFrame, df2: pd.DataFrame, by: str = "pos"
+) -> Tuple[pd.Index, pd.Index, np.ndarray]:
     """
     Align two SNP dataframes by SNP, CHROM, POS, with the following 3 steps:
     1. match SNPs in `df1` and `df2` by `CHROM` and `POS`
@@ -300,16 +302,14 @@ def align_snp(df1: pd.DataFrame, df2: pd.DataFrame) -> Tuple[pd.Index, pd.Index,
     3. {-1, 1} vectors indicating which location needs to be flipped will be also returned
     so that df1.loc[idx1, cols] and df2.loc[idx2, cols] * sign can be aligned.
 
-    TODO: ambiguous alleles (A/T and C/G) will be removed.
-    TODO: strand flip will be coped.
-
     Parameters
     ----------
     df1 : pd.DataFrame
         Dataframe 1 containing CHROM, POS, REF, ALT
     df2 : pd.DataFrame
         Dataframe 2 containing CHROM, POS, REF, ALT
-
+    by : str
+        either by pos (chromosome and position) of snp (SNP ID)
     Returns
     -------
     df1_idx : pd.Index
@@ -318,10 +318,22 @@ def align_snp(df1: pd.DataFrame, df2: pd.DataFrame) -> Tuple[pd.Index, pd.Index,
         Index of df2
     flip_sign : np.ndarray
         Sign of the alignment
+
+    TODO
+    ----
+    TODO: ambiguous alleles (A/T and C/G) will be removed.
+    TODO: strand flip will be coped.
     """
     # check df1.index and df2.index are unique
     assert df1.index.is_unique and df2.index.is_unique, "df1.index and df2.index must be unique"
-    required_cols = ["CHROM", "POS", "REF", "ALT"]
+    if by == "pos":
+        required_cols = ["CHROM", "POS", "REF", "ALT"]
+        on_cols = ["CHROM", "POS"]
+    elif by == "id":
+        required_cols = ["SNP", "REF", "ALT"]
+        on_cols = ["SNP"]
+    else:
+        raise ValueError("by must be either 'pos' or 'id'")
     # check required columns are in df1 and df2
     for df in [df1, df2]:
         assert set(required_cols).issubset(
@@ -334,7 +346,7 @@ def align_snp(df1: pd.DataFrame, df2: pd.DataFrame) -> Tuple[pd.Index, pd.Index,
     df_merged = pd.merge(
         df1.reset_index(),
         df2.reset_index(),
-        on=["CHROM", "POS"],
+        on=on_cols,
         suffixes=["1", "2"],
     )
     assert len(df_merged) > 0, "df1 and df2 must contain at least one common SNP"
