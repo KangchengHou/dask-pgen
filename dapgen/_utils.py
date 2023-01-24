@@ -125,9 +125,7 @@ def _score_single_plink(
         df_score = df_score.set_index(df_score.columns[0])
         df_score.index.name = "indiv"
     elif path.endswith(".bed"):
-        df_score.index = (
-            df_score.iloc[:, 0].astype(str) + "_" + df_score.iloc[:, 1].astype(str)
-        )
+        df_score.index = df_score.iloc[:, 0].astype(str) + "_" + df_score.iloc[:, 1].astype(str)
         df_score.index.name = "indiv"
     else:
         raise ValueError("path must end with .pgen or .bed")
@@ -204,9 +202,7 @@ def _score_multiple_plink(
             if df_snp is None:
                 df_snp = this_df_snp
             else:
-                assert df_snp.equals(
-                    this_df_snp
-                ), "df_snp must be the same for all indiv"
+                assert df_snp.equals(this_df_snp), "df_snp must be the same for all indiv"
     elif merge_dim == "snp":
         df_score = None
         df_snp_list = []
@@ -222,9 +218,7 @@ def _score_multiple_plink(
             if df_score is None:
                 df_score = this_df_score
             else:
-                assert df_score.index.equals(
-                    this_df_score.index
-                ), "index must be the same"
+                assert df_score.index.equals(this_df_score.index), "index must be the same"
                 df_score += this_df_score
             df_snp_list.append(df_snp)
         df_snp = pd.concat(df_snp_list, axis=0)
@@ -296,9 +290,7 @@ def score(
     return df_score, df_snp
 
 
-def align_snp(
-    df1: pd.DataFrame, df2: pd.DataFrame
-) -> Tuple[pd.Index, pd.Index, np.ndarray]:
+def align_snp(df1: pd.DataFrame, df2: pd.DataFrame) -> Tuple[pd.Index, pd.Index, np.ndarray]:
     """
     Align two SNP dataframes by SNP, CHROM, POS, with the following 3 steps:
     1. match SNPs in `df1` and `df2` by `CHROM` and `POS`
@@ -328,9 +320,7 @@ def align_snp(
         Sign of the alignment
     """
     # check df1.index and df2.index are unique
-    assert (
-        df1.index.is_unique and df2.index.is_unique
-    ), "df1.index and df2.index must be unique"
+    assert df1.index.is_unique and df2.index.is_unique, "df1.index and df2.index must be unique"
     required_cols = ["CHROM", "POS", "REF", "ALT"]
     # check required columns are in df1 and df2
     for df in [df1, df2]:
@@ -351,9 +341,7 @@ def align_snp(
     noflip_index = (df_merged["REF1"] == df_merged["REF2"]) & (
         df_merged["ALT1"] == df_merged["ALT2"]
     )
-    flip_index = (df_merged["REF1"] == df_merged["ALT2"]) & (
-        df_merged["ALT1"] == df_merged["REF2"]
-    )
+    flip_index = (df_merged["REF1"] == df_merged["ALT2"]) & (df_merged["ALT1"] == df_merged["REF2"])
     df_merged.loc[noflip_index, "flip_sign"] = 1
     df_merged.loc[flip_index, "flip_sign"] = -1
 
