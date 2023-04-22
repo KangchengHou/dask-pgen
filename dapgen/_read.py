@@ -84,9 +84,7 @@ def _read_multiple_plink(
     df_snp_list = []
     df_indiv_list = []
     for path in paths:
-        geno, df_snp, df_indiv = _read_single_plink(
-            path=path, phase=phase, snp_chunk=snp_chunk
-        )
+        geno, df_snp, df_indiv = _read_single_plink(path=path, phase=phase, snp_chunk=snp_chunk)
         geno_list.append(geno)
         df_snp_list.append(df_snp)
         df_indiv_list.append(df_indiv)
@@ -103,10 +101,7 @@ def _read_multiple_plink(
         # determine the df_snp order such that the order is sorted by
         # last element of CHROM and POS in each df_snp
         df_chrom_pos = pd.DataFrame(
-            [
-                [df_snp.iloc[-1]["CHROM"], df_snp.iloc[-1]["POS"]]
-                for df_snp in df_snp_list
-            ],
+            [[df_snp.iloc[-1]["CHROM"], df_snp.iloc[-1]["POS"]] for df_snp in df_snp_list],
             columns=["CHROM", "POS"],
         )
         # sort by CHROM and POS
@@ -168,8 +163,7 @@ def parse_plink_path(pathname: Union[str, List]) -> List[str]:
                 out = bed_list
             else:
                 raise ValueError(
-                    f"Either the directory={pathname} contains .pgen or .bed files,"
-                    " but not both"
+                    f"Either the directory={pathname} contains .pgen or .bed files," " but not both"
                 )
             out = natsorted(out)
         elif pathname.endswith(".bed") or pathname.endswith(".pgen"):
@@ -322,9 +316,7 @@ def read_pgen(path: str, snp_chunk: int = 1024, phase: bool = False):
     return concatenate(snp_chunk_xs, 0, False)
 
 
-def _read_pgen_chunk(
-    path: str, snp_start: int, snp_stop: int, phase: bool, n_indiv: int = None
-):
+def _read_pgen_chunk(path: str, snp_start: int, snp_stop: int, phase: bool, n_indiv: int = None):
     """
     Read a chunk of SNPs from a pgen file
 
@@ -346,14 +338,10 @@ def _read_pgen_chunk(
     # np.int32 is required by pgenlib
     with pgenlib.PgenReader(bytes(path, "utf8"), raw_sample_ct=n_indiv) as pgen:
         if phase:
-            geno = np.empty(
-                [snp_stop - snp_start, pgen.get_raw_sample_ct() * 2], dtype=np.int32
-            )
+            geno = np.empty([snp_stop - snp_start, pgen.get_raw_sample_ct() * 2], dtype=np.int32)
             pgen.read_alleles_range(snp_start, snp_stop, geno)
         else:
-            geno = np.empty(
-                [snp_stop - snp_start, pgen.get_raw_sample_ct()], dtype=np.int32
-            )
+            geno = np.empty([snp_stop - snp_start, pgen.get_raw_sample_ct()], dtype=np.int32)
             pgen.read_range(snp_start, snp_stop, geno)
 
     geno = np.ascontiguousarray(geno, np.float32)
@@ -426,15 +414,20 @@ def read_psam(path):
     skiprows = 0
     with open(path) as f:
         for line in f:
-            if line.startswith("#IID"):
+            if line.startswith("#IID") or line.startswith("#FID"):
                 break
             skiprows += 1
 
-    df_psam = (
-        pd.read_csv(path, delim_whitespace=True, skiprows=skiprows)
-        .rename(columns={"#IID": "indiv"})
-        .set_index("indiv")
-    )
+    df_psam = pd.read_csv(path, delim_whitespace=True, skiprows=skiprows)
+    # only one column as index
+    if df_psam.columns[0] == "#IID":
+        df_psam = df_psam.set_index("#IID")
+    elif df_psam.columns[0] == "#FID":
+        assert (
+            df_psam.columns[1] == "IID"
+        ), "if psam's first column is #FID, the second column must be IID"
+        df_psam.index = df_psam["#FID"].astype(str) + "_" + df_psam["IID"].astype(str)
+        df_psam = df_psam.drop(columns=["#FID", "IID"])
     df_psam.index = df_psam.index.astype(str)
 
     return df_psam
