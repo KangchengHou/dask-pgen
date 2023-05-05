@@ -429,5 +429,5 @@ def read_psam(path):
         df_psam.index = df_psam["#FID"].astype(str) + "_" + df_psam["IID"].astype(str)
         df_psam = df_psam.drop(columns=["#FID", "IID"])
     df_psam.index = df_psam.index.astype(str)
-
+    df_psam.index.name = "indiv"
     return df_psam
