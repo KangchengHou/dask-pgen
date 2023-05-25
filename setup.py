@@ -24,7 +24,7 @@ setup(
         "natsort",
         "fire",
         "structlog",
-        "Pgenlib",
+        "Pgenlib @ git+https://github.com/chrchang/plink-ng.git@fc08f4396c521ce48058804c627f8a3397b1e3f7#egg=pgenlib&subdirectory=2.0/Python",
     ],
     scripts=["bin/dapgen"],
 )
