@@ -3,9 +3,10 @@ import pgenlib
 import dask.array as da
 import pandas as pd
 from typing import List
+from typing import Union
 
 
-def write_pgen(path: str, geno: da.Array):
+def write_pgen(path: str, geno: Union[da.Array, np.ndarray]):
     """
     Write a pgen file.
 
@@ -21,6 +22,8 @@ def write_pgen(path: str, geno: da.Array):
 
     # replace na with -9
     geno[np.isnan(geno)] = -9
+    if isinstance(geno, da.Array):
+        geno = geno.compute()
 
     if geno.ndim == 3:
         n_snp, n_indiv = geno.shape[0:2]
@@ -32,9 +35,7 @@ def write_pgen(path: str, geno: da.Array):
             nonref_flags=False,
             hardcall_phase_present=True,
         ) as writer:
-            writer.append_alleles_batch(
-                geno.astype(np.int32).compute(), all_phased=True
-            )
+            writer.append_alleles_batch(geno.astype(np.int32), all_phased=True)
     elif geno.ndim == 2:
         n_snp, n_indiv = geno.shape[0:2]
         with pgenlib.PgenWriter(
@@ -44,7 +45,7 @@ def write_pgen(path: str, geno: da.Array):
             nonref_flags=False,
             hardcall_phase_present=False,
         ) as writer:
-            writer.append_biallelic_batch(geno.astype(np.int8).compute())
+            writer.append_biallelic_batch(geno.astype(np.int8))
 
 
 def write_pvar(path: str, df_pvar: pd.DataFrame, header: List[str] = None):
@@ -65,9 +66,7 @@ def write_pvar(path: str, df_pvar: pd.DataFrame, header: List[str] = None):
     df_pvar = df_pvar.reset_index().rename(columns={"snp": "ID", "CHROM": "#CHROM"})
 
     FIXED_COLS = ["#CHROM", "POS", "ID", "REF", "ALT"]
-    df_pvar = df_pvar[
-        FIXED_COLS + [col for col in df_pvar.columns if col not in FIXED_COLS]
-    ]
+    df_pvar = df_pvar[FIXED_COLS + [col for col in df_pvar.columns if col not in FIXED_COLS]]
     with open(path, "w") as f:
         if (header is not None) and len(header) > 0:
             assert np.all([h.startswith("#") for h in header])

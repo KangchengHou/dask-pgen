@@ -84,7 +84,9 @@ def _read_multiple_plink(
     df_snp_list = []
     df_indiv_list = []
     for path in paths:
-        geno, df_snp, df_indiv = _read_single_plink(path=path, phase=phase, snp_chunk=snp_chunk)
+        geno, df_snp, df_indiv = _read_single_plink(
+            path=path, phase=phase, snp_chunk=snp_chunk
+        )
         geno_list.append(geno)
         df_snp_list.append(df_snp)
         df_indiv_list.append(df_indiv)
@@ -101,7 +103,10 @@ def _read_multiple_plink(
         # determine the df_snp order such that the order is sorted by
         # last element of CHROM and POS in each df_snp
         df_chrom_pos = pd.DataFrame(
-            [[df_snp.iloc[-1]["CHROM"], df_snp.iloc[-1]["POS"]] for df_snp in df_snp_list],
+            [
+                [df_snp.iloc[-1]["CHROM"], df_snp.iloc[-1]["POS"]]
+                for df_snp in df_snp_list
+            ],
             columns=["CHROM", "POS"],
         )
         # sort by CHROM and POS
@@ -163,7 +168,8 @@ def parse_plink_path(pathname: Union[str, List]) -> List[str]:
                 out = bed_list
             else:
                 raise ValueError(
-                    f"Either the directory={pathname} contains .pgen or .bed files," " but not both"
+                    f"Either the directory={pathname} contains .pgen or .bed files,"
+                    " but not both"
                 )
             out = natsorted(out)
         elif pathname.endswith(".bed") or pathname.endswith(".pgen"):
@@ -316,7 +322,9 @@ def read_pgen(path: str, snp_chunk: int = 1024, phase: bool = False):
     return concatenate(snp_chunk_xs, 0, False)
 
 
-def _read_pgen_chunk(path: str, snp_start: int, snp_stop: int, phase: bool, n_indiv: int = None):
+def _read_pgen_chunk(
+    path: str, snp_start: int, snp_stop: int, phase: bool, n_indiv: int = None
+):
     """
     Read a chunk of SNPs from a pgen file
 
@@ -338,10 +346,14 @@ def _read_pgen_chunk(path: str, snp_start: int, snp_stop: int, phase: bool, n_in
     # np.int32 is required by pgenlib
     with pgenlib.PgenReader(bytes(path, "utf8"), raw_sample_ct=n_indiv) as pgen:
         if phase:
-            geno = np.empty([snp_stop - snp_start, pgen.get_raw_sample_ct() * 2], dtype=np.int32)
+            geno = np.empty(
+                [snp_stop - snp_start, pgen.get_raw_sample_ct() * 2], dtype=np.int32
+            )
             pgen.read_alleles_range(snp_start, snp_stop, geno)
         else:
-            geno = np.empty([snp_stop - snp_start, pgen.get_raw_sample_ct()], dtype=np.int32)
+            geno = np.empty(
+                [snp_stop - snp_start, pgen.get_raw_sample_ct()], dtype=np.int32
+            )
             pgen.read_range(snp_start, snp_stop, geno)
 
     geno = np.ascontiguousarray(geno, np.float32)
@@ -354,10 +366,12 @@ def _read_pgen_chunk(path: str, snp_start: int, snp_stop: int, phase: bool, n_in
 
 
 def read_bim(path: str) -> pd.DataFrame:
+    # read first 6 columns
     return pd.read_csv(
         path,
         header=None,
         delim_whitespace=True,
+        usecols=[0, 1, 2, 3, 4, 5],
         names=["CHROM", "snp", "CM", "POS", "ALT", "REF"],
     ).set_index("snp")
 
