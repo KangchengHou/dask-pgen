@@ -87,8 +87,14 @@ def _score_single_plink(
     plink2_bin = get_dependency("plink2")
     with tempfile.TemporaryDirectory() as tmp_dir:
         df_weight.to_csv(os.path.join(tmp_dir, "weight.txt"), sep="\t", index=True)
+        np.savetxt(
+            os.path.join(tmp_dir, "weight_snps.txt"),
+            df_snp_idx,
+            fmt="%s",
+            delimiter="\n",
+        )
         cmds = [
-            f"{plink2_bin} --score {tmp_dir}/weight.txt 1 2 header-read cols=+scoresums,-scoreavgs"
+            f"{plink2_bin} --extract {os.path.join(tmp_dir, 'weight_snps.txt')} --score {tmp_dir}/weight.txt 1 2 header-read cols=+scoresums,-scoreavgs"
         ]
         if center:
             # append center to --score argument
@@ -125,7 +131,9 @@ def _score_single_plink(
         df_score = df_score.set_index(df_score.columns[0])
         df_score.index.name = "indiv"
     elif path.endswith(".bed"):
-        df_score.index = df_score.iloc[:, 0].astype(str) + "_" + df_score.iloc[:, 1].astype(str)
+        df_score.index = (
+            df_score.iloc[:, 0].astype(str) + "_" + df_score.iloc[:, 1].astype(str)
+        )
         df_score.index.name = "indiv"
     else:
         raise ValueError("path must end with .pgen or .bed")
@@ -202,7 +210,9 @@ def _score_multiple_plink(
             if df_snp is None:
                 df_snp = this_df_snp
             else:
-                assert df_snp.equals(this_df_snp), "df_snp must be the same for all indiv"
+                assert df_snp.equals(
+                    this_df_snp
+                ), "df_snp must be the same for all indiv"
     elif merge_dim == "snp":
         df_score = None
         df_snp_list = []
@@ -218,7 +228,9 @@ def _score_multiple_plink(
             if df_score is None:
                 df_score = this_df_score
             else:
-                assert df_score.index.equals(this_df_score.index), "index must be the same"
+                assert df_score.index.equals(
+                    this_df_score.index
+                ), "index must be the same"
                 df_score += this_df_score
             df_snp_list.append(df_snp)
         df_snp = pd.concat(df_snp_list, axis=0)
@@ -321,11 +333,20 @@ def align_snp(
 
     TODO
     ----
-    TODO: ambiguous alleles (A/T and C/G) will be removed.
-    TODO: strand flip will be coped.
+    TODO: ambiguous alleles (A/T and C/G) should be removed.
     """
-    # check df1.index and df2.index are unique
-    assert df1.index.is_unique and df2.index.is_unique, "df1.index and df2.index must be unique"
+    if not df1.index.is_unique:
+        # print the first two row numbers that are not unique
+        dup_index = df1.index[df1.index.duplicated(keep=False)]
+        raise ValueError(
+            f"df1.index must be unique, but contains {len(dup_index)} duplicates (e.g., {dup_index[0]})"
+        )
+    if not df2.index.is_unique:
+        dup_index = df2.index[df2.index.duplicated(keep=False)]
+        raise ValueError(
+            f"df2.index must be unique, but contains {len(dup_index)} duplicates (e.g., {dup_index[0]})"
+        )
+
     if by == "pos":
         required_cols = ["CHROM", "POS", "REF", "ALT"]
         on_cols = ["CHROM", "POS"]
@@ -353,7 +374,9 @@ def align_snp(
     noflip_index = (df_merged["REF1"] == df_merged["REF2"]) & (
         df_merged["ALT1"] == df_merged["ALT2"]
     )
-    flip_index = (df_merged["REF1"] == df_merged["ALT2"]) & (df_merged["ALT1"] == df_merged["REF2"])
+    flip_index = (df_merged["REF1"] == df_merged["ALT2"]) & (
+        df_merged["ALT1"] == df_merged["REF2"]
+    )
     df_merged.loc[noflip_index, "flip_sign"] = 1
     df_merged.loc[flip_index, "flip_sign"] = -1
 
