@@ -23,7 +23,6 @@ def cd(newdir):
 
 
 def get_dependency(name, download=True):
-
     """Get path to an depenency
     Find the binary in the following locations:
     - $PATH
@@ -67,6 +66,15 @@ def _score_single_plink(
         [description]
     df_weight : pd.DataFrame
         [description]
+
+    Notes
+    -----
+
+    In some cases (e.g., All of Us), we have two splitted SNPs in genotype file
+    chr1:51001424:C:CT and chr1:51001424:CT:C, this function will match both SNPs using
+    the same row from weight file. `df_weight` will contain two rows
+    (chr1:51001424:C:CT, chr1:51001424:CT:C) with opposite effects, just as if there
+    are indeed two SNPs. Then everything else would follow through.
     """
     if path.endswith(".pgen"):
         df_snp = read_pvar(path.replace(".pgen", ".pvar"))
@@ -186,7 +194,6 @@ def _score_multiple_plink(
     freq_suffix: Optional[str],
     **kwargs,
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
-
     # multiple plink files
     merge_dim = infer_merge_dim(path_list)
     if merge_dim == "indiv":
@@ -330,10 +337,6 @@ def align_snp(
         Index of df2
     flip_sign : np.ndarray
         Sign of the alignment
-
-    TODO
-    ----
-    TODO: ambiguous alleles (A/T and C/G) should be removed.
     """
     if not df1.index.is_unique:
         # print the first two row numbers that are not unique
