@@ -263,7 +263,6 @@ def read_pfile(
 
 
 def read_pgen(path: str, snp_chunk: int = 1024, phase: bool = False):
-
     """Read pgen file including .pgen and .bed files
 
     Parameters
@@ -414,6 +413,7 @@ def read_pvar(path: str, return_header: bool = False):
         .rename(columns={"#CHROM": "CHROM", "ID": "snp"})
         .set_index("snp")
     )
+
     assert np.isin(
         ["CHROM", "POS", "REF", "ALT"], df_pvar.columns
     ).all(), "pvar file must have columns CHROM, POS, SNP, REF, and ALT"
