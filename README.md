@@ -1,15 +1,17 @@
 # dask-pgen
-Lazy loading PLINK genotype data (.pgen or .bed) file with dask-array.
+Lazy loading PLINK genotype data (.pgen or .bed) file with dask array.
 
 # Installation
+
+```bash
+pip install dask-pgen
+```
+
+or, 
 ```bash
 pip install -U cython numpy
 git clone https://github.com/KangchengHou/dask-pgen.git
 cd dask-pgen; pip install -e .
-```
-Or,
-```bash
-pip install git+https://github.com/KangchengHou/dask-pgen.git
 ```
 
 # Example
