@@ -409,7 +409,7 @@ def read_pvar(path: str, return_header: bool = False):
             skiprows += 1
 
     df_pvar = (
-        pd.read_csv(path, delim_whitespace=True, skiprows=skiprows)
+        pd.read_csv(path, delim_whitespace=True, skiprows=skiprows, low_memory=False)
         .rename(columns={"#CHROM": "CHROM", "ID": "snp"})
         .set_index("snp")
     )
