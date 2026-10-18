@@ -35,7 +35,7 @@ def score(
     assert center in [True, False], "center must be True or False"
     log.info(f"Reading weights from {weights}")
     # parse arguments
-    df_weights = pd.read_csv(weights, delim_whitespace=True)
+    df_weights = pd.read_csv(weights, sep=r"\s+")
     assert np.all(
         [col in df_weights.columns for col in [chrom_col, pos_col, ref_col, alt_col]]
     ), (

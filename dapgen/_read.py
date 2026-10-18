@@ -369,7 +369,7 @@ def read_bim(path: str) -> pd.DataFrame:
     return pd.read_csv(
         path,
         header=None,
-        delim_whitespace=True,
+        sep=r"\s+",
         usecols=[0, 1, 2, 3, 4, 5],
         names=["CHROM", "snp", "CM", "POS", "ALT", "REF"],
     ).set_index("snp")
@@ -379,7 +379,7 @@ def read_fam(path: str):
     df = pd.read_csv(
         path,
         header=None,
-        delim_whitespace=True,
+        sep=r"\s+",
         usecols=[0, 1],
         names=["FID", "IID"],
     ).astype(str)
@@ -409,7 +409,7 @@ def read_pvar(path: str, return_header: bool = False):
             skiprows += 1
 
     df_pvar = (
-        pd.read_csv(path, delim_whitespace=True, skiprows=skiprows, low_memory=False)
+        pd.read_csv(path, sep=r"\s+", skiprows=skiprows, low_memory=False)
         .rename(columns={"#CHROM": "CHROM", "ID": "snp"})
         .set_index("snp")
     )
@@ -432,7 +432,7 @@ def read_psam(path):
                 break
             skiprows += 1
 
-    df_psam = pd.read_csv(path, delim_whitespace=True, skiprows=skiprows)
+    df_psam = pd.read_csv(path, sep=r"\s+", skiprows=skiprows)
     # only one column as index
     if df_psam.columns[0] == "#IID":
         df_psam = df_psam.set_index("#IID")
